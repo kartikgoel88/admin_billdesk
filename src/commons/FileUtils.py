@@ -6,7 +6,7 @@ import fitz
 import numpy as np
 import pytesseract
 
-class Utils:
+class FileUtils:
 
     @staticmethod
     def get_ocr_text_from_file(pdf_path):
