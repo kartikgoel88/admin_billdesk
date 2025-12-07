@@ -18,6 +18,7 @@ class Extractor:
     client = Groq()
 
     system_prompt = FileUtils.load_text_file(system_prompt_file_path)
+    print(system_prompt)
     user_prompt = f"""{receipts}"""
     model = "llama-3.3-70b-versatile"
 

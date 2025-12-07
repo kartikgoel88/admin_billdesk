@@ -9,7 +9,7 @@ import pytesseract
 class FileUtils:
 
     @staticmethod
-    def get_ocr_text_from_file(pdf_path):
+    def get_ocr_text_from_file(pdf_name,pdf_path):
 
         doc = fitz.open(pdf_path)
         full_text = ""
@@ -38,7 +38,7 @@ class FileUtils:
             text_ocr = pytesseract.image_to_string(gray, lang="eng")
             full_text += text_ocr + "\n"
 
-        return full_text
+        return {pdf_name:full_text}
 
     @staticmethod
     def process_folder(folder_path: str):
@@ -52,7 +52,7 @@ class FileUtils:
                 pdf_name = os.path.splitext(filename)[0]
                 print(pdf_name)
                 print(f"📄 Processing: {pdf_path}")
-                result = FileUtils.get_ocr_text_from_file(pdf_path)
+                result = FileUtils.get_ocr_text_from_file(pdf_name,pdf_path)
                 results.append(result)
 
         return results
