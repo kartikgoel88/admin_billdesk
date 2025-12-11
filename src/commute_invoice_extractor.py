@@ -1,39 +1,17 @@
 import json
 import sys
-from typing import Optional
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from pydantic import BaseModel, RootModel
 
 from commons.FileUtils import FileUtils
+from entity.ride_extraction_schema import RideExtractionList
 
+## Run command : python src/bill_extractor_tesseract.py D:/pycharm/admin_billdesk/resources/commute D:\pycharm\admin_billdesk\src\prompt\system_prompt_cab.txt
+## export api key via PS :$env:GROQ_API_KEY="API_KEY"
 
-# ------------------------
-# 1. Define Expected Output
-# ------------------------
-
-class RideExtraction(BaseModel):
-    filename: str
-    ride_id: Optional[str]
-    date: Optional[str]
-    time: Optional[str]
-    pickup_address: Optional[str]
-    drop_address: Optional[str]
-    amount: Optional[float]
-    distance_km: Optional[float]
-    service_provider: Optional[str]
-    ocr: Optional[str]
-
-
-class RideExtractionList(RootModel[list[RideExtraction]]):
-    pass
-# ------------------------
-# 2. Main Extractor Class
-# ------------------------
-
-class Extractor:
+class CommuteExtractor:
 
     def __init__(self, input_folder, system_prompt_path):
         self.input_folder = input_folder
@@ -116,5 +94,5 @@ if __name__ == "__main__":
     input_folder = sys.argv[1]
     system_prompt_file_path = sys.argv[2]
 
-    extractor = Extractor(input_folder, system_prompt_file_path)
+    extractor = CommuteExtractor(input_folder, system_prompt_file_path)
     extractor.run()

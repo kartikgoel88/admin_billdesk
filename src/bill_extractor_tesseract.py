@@ -5,8 +5,6 @@ from groq import Groq
 from commons.llm_utils import LLMUtils
 from commons.FileUtils import FileUtils
 
-## Run command : python src/bill_extractor_tesseract.py D:/pycharm/admin_billdesk/resources/commute D:\pycharm\admin_billdesk\src\prompt\system_prompt_cab.txt
-## export api key via PS :$env:GROQ_API_KEY="API_KEY"
 class Extractor:
 
     path = sys.argv[1] #"D:/pycharm/admin_billdesk/resources/commute"
