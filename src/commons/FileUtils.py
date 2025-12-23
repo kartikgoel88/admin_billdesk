@@ -1,10 +1,27 @@
 import json
 import os
+from dataclasses import dataclass
 
 import cv2
 import fitz
 import numpy as np
 import pytesseract
+
+
+@dataclass
+class Employee:
+    emp_id: str
+    emp_name: str
+    month : str
+    client : str
+
+    def to_dict(self) -> dict:
+        return {
+            "emp_id": self.emp_id,
+            "emp_name": self.emp_name,
+            "month": self.month,
+            "client": self.client
+        }
 
 class FileUtils:
 
@@ -56,6 +73,19 @@ class FileUtils:
                 results.append(result)
 
         return results
+
+    @staticmethod
+    def extract_info_from_foldername(folder_path: str):
+        if not os.path.isdir(folder_path):
+            raise ValueError(f"Not a folder: {folder_path}")
+
+        folder_name = os.path.basename(folder_path)
+        emp = folder_name.split("_")
+        emp_id = emp[0]
+        emp_name = emp[1]
+        month = emp[2]
+        client = emp[3]
+        return Employee(emp_id, emp_name, month, client)
 
     @staticmethod
     def write_json_to_file(output, file_path):

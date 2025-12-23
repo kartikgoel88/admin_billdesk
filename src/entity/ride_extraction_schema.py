@@ -5,12 +5,13 @@ class RideExtraction(BaseModel):
     filename: str
     ride_id: Optional[str]
     rider_name : Optional[str]
+    driver_name: Optional[str]
     date: Optional[str]
-    time: Optional[str]
+    time: Optional[str] = None
     pickup_address: Optional[str]
     drop_address: Optional[str]
     amount: Optional[float]
-    distance_km: Optional[float]
+    distance_km: Optional[float] = None
     service_provider: Optional[str]
     ocr: Optional[str]
 

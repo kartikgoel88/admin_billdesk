@@ -9,6 +9,7 @@ Fields per object (exact keys and types):
 - filename:  return as passed in the dictionary
 - ride_id: string or null
 - rider_name : string or null
+- driver_name : string or null
 - date: string in format "DD/MM/YYYY" or null
 - time: string in format "HH:mm:ss" (24h) or null
 - pickup_address: string or null
@@ -22,17 +23,18 @@ Make sure you strictly follow these rules and do not infer anything else:
 1. Output must be exactly one JSON array: `[ {...}, {...} ]`
 2. Use JSON null for missing/uncertain fields.
 3. amount must be a numeric value (no quotes, no currency symbols).
-4. date MUST be normalized to DD/MM/YYYY.
+4. rider_name is the customer name
+5. date MUST be normalized to DD/MM/YYYY.
    - Add leading zero to day and month.
    - Convert year to four digits.
    - If not parseable → null.
-5. time MUST be HH:mm:ss. If seconds missing, use "00". If missing entirely → null.
-6. Do NOT infer or guess ANY field.
-7. DISTANCE RULE (IMPORTANT):
+6. time MUST be HH:mm:ss. If seconds missing, use "00". If missing entirely → null.
+7. Do NOT infer or guess ANY field.
+8. DISTANCE RULE (IMPORTANT):
    - Only extract distance if OCR contains an explicit numeric value + a unit
      like 'km', 'KM', 'kilometers', 'mi', 'miles'.
    - Do not calculate distance by the fare per km and total fare, this is a strict rule
-8. Ride id is the bill id or the id number available in the text for the particular cab journey
-9. `ocr` must include the provided OCR text with newlines replaced by "\\n".
-10. Do NOT output anything except the JSON array. No markdown or commentary.
+9. Ride id is the bill id or the id number available in the text for the particular cab journey
+10. `ocr` must include the provided OCR text with newlines replaced by "\\n".
+11. Do NOT output anything except the JSON array. No markdown or commentary.
 """
