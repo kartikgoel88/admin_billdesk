@@ -94,7 +94,7 @@ class FileUtils:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        print("data written to output.json")
+        print(f"data written to {file_path}")
 
     @staticmethod
     def load_text_file(file_path):
