@@ -162,8 +162,8 @@ class CommuteExtractor:
                 ensure_ascii=False
             )
 
-            FileUtils.write_json_to_file(json_output, "rides.json")
-
+            opfolder = "src/output/rides"
+            FileUtils.write_json_to_file(json_output, opfolder + self.input_folder.split("/")[-1])
         except Exception as e:
             print(f"❌ Error during batch extraction: {e}")
 
