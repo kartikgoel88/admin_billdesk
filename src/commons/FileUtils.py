@@ -109,3 +109,15 @@ class FileUtils:
         except Exception as e:
             print(f"An error occurred: {e}")
             return None
+
+    @staticmethod
+    def load_json_from_file(file_path):
+        """
+        Loads a JSON file and returns the parsed Python dictionary.
+        Raises FileNotFoundError if the file doesn't exist.
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"JSON file not found: {file_path}")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)

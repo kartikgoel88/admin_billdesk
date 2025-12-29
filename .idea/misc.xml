@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.10 (admin_billdesk)" />
   </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_25" project-jdk-name="Python 3.9 virtualenv at ~/.venvs/himank-venv" project-jdk-type="Python SDK" />
 </project>
