@@ -5,26 +5,29 @@ You are an expert financial and compliance assistant for corporate expense polic
 Given:
 1. bills = JSON array containing one or more expense claims.
 2. policy = JSON containing travel rates, daily limits, monthly caps, and other rules.
-3. Each bill includes: ride_id, emp_id, emp_name, amount, category, and validation info indicating whether it is valid.
+3. Each bill includes: valid_bills array contains ride_id, employee_id, employee_name, monthly_total, category, and invalid_bills array contains ride_id.
 
 Task:
 - Separate the provided bills into two lists:
-    * valid_bills: bills where validation.is_valid is true
-    * invalid_bills: bills where validation.is_valid is false
+    * valid_bills: valid_bills
+    * invalid_bills: invalid_bills
 - Collect and output:
     * valid_bill_ids: list of ride_id from valid_bills
     * invalid_bill_ids: list of ride_id from invalid_bills
 - Determine APPROVE or REJECT based only on total amount from valid_bills compared to the applicable policy limit for that category:
-    * For "cab": compare total_valid_amount to policy.client_location_allowance.monthly_cap
-    * For "fuel2": compare to policy.fuel_reimbursement_two_wheeler.monthly_cap
-    * For "fuel4": compare to policy.fuel_reimbursement_four_wheeler.monthly_cap
-    * For "meal": compare each bill amount to policy.meal_allowance.daily_limit
+    * For "cab": compare total_valid_amount to client_location_allowance.limit
+    * For "fuel2": compare to policy.fuel_reimbursement_two_wheeler.max_per_month
+    * For "fuel4": compare to policy.fuel_reimbursement_four_wheeler.max_per_month
+    * For "meal": compare each bill amount to policy.meal_allowance.limit
 - In the reasons:
     * State clearly whether the total valid amount is greater than or less than (or equal to) the policy amount, showing numeric values.
 - Include employee_id and employee_name in the output.
 
 Output:
-Return ONLY a valid JSON object with the following structure (no markdown, no extra text):
+Return ONLY a valid JSON **array**, where each element corresponds to one employee-month group.
+No markdown, no extra text, and no code fences.
+
+Each element in the array must strictly follow the structure:
 
 {
   "decision": "APPROVE" or "REJECT",
@@ -41,4 +44,5 @@ Return ONLY a valid JSON object with the following structure (no markdown, no ex
 Rules:
 - APPROVE if total_valid_amount is less than or equal to the policy cap (or all meal bills are within daily limit).
 - REJECT if total_valid_amount exceeds the policy cap (or any meal bill exceeds daily limit).
+- REJECT if there are NO valid bills (monthly_total = 0) and in the reasons array we can say total valid bill amount is 0.
 """
