@@ -1,6 +1,6 @@
 D:\pycharm\admin_billdesk\.venv\Scripts\python.exe D:\pycharm\admin_billdesk\src\app\decision_service.py
-✅ Valid bill IDs: ['FDP0XuJ8oK', 'xASuTv78SR', 'RD17600645766209558', 'RD17600878534951314', 'RD17612917392457647', 'RD17615427980376086', 'RD17615552324814171', 'RD17618876987804019', 'RD17619015438879722']
-💰 Total amount for valid bills: 2329.0
+✅ Valid bill IDs: ['RD17600645766209558', 'RD17600878534951314', 'RD17612917392457647', 'RD17615427980376086', 'RD17615552324814171', 'RD17618876987804019', 'RD17619015438879722']
+💰 Total amount for valid bills: 1319.0
 ❌ Invalid bill IDs: []
 file text loaded successfully:
 
@@ -8,15 +8,20 @@ file text loaded successfully:
 ```json
 {
   "decision": "APPROVE",
-  "employee_id": "IIIPL-3185",
-  "employee_name": "SMITHA",
+  "employee_id": "IIIPL-5030",
+  "employee_name": "SIREESHA",
   "valid_bill_ids": [
-    "FDP0XuJ8oK",
-    "xASuTv78SR"
+    "RD17600645766209558",
+    "RD17600878534951314",
+    "RD17612917392457647",
+    "RD17615427980376086",
+    "RD17615552324814171",
+    "RD17618876987804019",
+    "RD17619015438879722"
   ],
   "invalid_bill_ids": [],
   "reasons": [
-    "Total valid amount (1010.0) is less than or equal to the policy cap (6000) for category 'cab'."
+    "The total valid amount (1319.0) is less than the policy cap for cab (6000)."
   ]
 }
 ```
