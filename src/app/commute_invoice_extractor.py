@@ -77,7 +77,7 @@ class CommuteExtractor:
         # 1. Month validation
         # -------------------------
         try:
-            ride_month = datetime.strptime(ride["date"], "%d/%m/%Y").month.lower()
+            ride_month = datetime.strptime(ride["date"], "%d/%m/%Y").month
             expected_month = MONTH_MAP.get(ride["month"].lower())
             validations["month_match"] = (ride_month == expected_month)
         except Exception:
