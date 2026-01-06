@@ -22,7 +22,6 @@ MONTH_MAP = {
 }
 
 class CommuteExtractor:
-
     def __init__(self, input_folder, system_prompt_path):
         self.input_folder = input_folder
         self.system_prompt_path = system_prompt_path
@@ -31,6 +30,7 @@ class CommuteExtractor:
             self.client_addresses = json.load(f)
 
         self.employee_meta = FileUtils.extract_info_from_foldername(self.input_folder)
+        self.category = {"category":"cab"}
         print(self.employee_meta)
         # Load receipts from folder
         # Should return a list of:  {"filename": "...", "text": "..."}
@@ -148,7 +148,8 @@ class CommuteExtractor:
             for item in output_data:
                 enriched = {
                     **item.model_dump(),
-                    **self.employee_meta.to_dict()
+                    **self.employee_meta.to_dict(),
+                    **self.category
                 }
 
                 validation = self.validate_ride(enriched, self.client_addresses)

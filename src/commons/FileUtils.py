@@ -7,21 +7,8 @@ import fitz
 import numpy as np
 import pytesseract
 
+from entity.employee import Employee
 
-@dataclass
-class Employee:
-    emp_id: str
-    emp_name: str
-    month : str
-    client : str
-
-    def to_dict(self) -> dict:
-        return {
-            "emp_id": self.emp_id,
-            "emp_name": self.emp_name,
-            "month": self.month,
-            "client": self.client
-        }
 
 class FileUtils:
 

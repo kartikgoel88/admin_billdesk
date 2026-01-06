@@ -1,12 +1,11 @@
-
-import sys
-import json
 import os
-from commons.FileUtils import FileUtils
-from commons.llm_utils import LLMUtils
+
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from langchain_core.output_parsers import StrOutputParser
+
+from commons.FileUtils import FileUtils
+
 
 class PolicyExtractor:
     def __init__(self, input_pdf_path, system_prompt_path):
@@ -44,14 +43,13 @@ class PolicyExtractor:
         })
 
         # Step 4: Save the JSON output using existing helper
-        FileUtils.write_json_to_file(output, "src/output/policy.json")
+        FileUtils.write_json_to_file(output, "D:/pycharm/admin_billdesk/src/output/policy.json")
 
         print(f"✅ Policy JSON written to policy.json from: {self.input_pdf_path}")
 
 
 if __name__ == "__main__":
-    pdf_path = "resources/policy/company_policy.pdf"
-    system_prompt_file_path = "src/prompt/system_prompt_policy.txt"
-
+    pdf_path = "D:/pycharm/admin_billdesk/resources/policy/company_policy.pdf"
+    system_prompt_file_path = "D:/pycharm/admin_billdesk/src/prompt/system_prompt_policy.txt"
     extractor = PolicyExtractor(pdf_path, system_prompt_file_path)
     extractor.run()

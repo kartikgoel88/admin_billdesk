@@ -1,0 +1,56 @@
+[
+  {
+    "filename": "Oct15Evening",
+    "ride_id": "FDP0XuJ8oK",
+    "rider_name": "Smitha",
+    "driver_name": "AVI N ASH",
+    "date": "15/10/2025",
+    "time": "16:41:00",
+    "pickup_address": "5, Nallurhalli, Whitefield, Bengaluru, Karnataka 560066, India",
+    "drop_address": "Oak Mont, Mahatma Gandhi Road, Horamavu Agara, Horamavu, Bengaluru, Karnataka, India",
+    "amount": 456.0,
+    "distance_km": null,
+    "service_provider": null,
+    "ocr": " \nHi Smitha! Here is your driver receipt. \nWed, 15 Oct, 2025 \nPayment Details \n₹ 456 \nBase Fare \n₹ 70 \nDistance Fare \n₹ 293 \nPickup Charges \n₹ 40 \nCongestion Charges \n₹ 53 \nFinal Amount Paid \n₹ 456 \nRide Details \nRideID: FDP0XuJ8oK \nDriver  N ame \nAVI N ASH \nLicense Plate \nKA03AM5710 \n04:41  PM \n5 ,  N allurhalli, Whitefield, Bengaluru, Karnataka 560066, India \n05:50  PM \nOak Mont, Mahatma Gandhi Road, Horamavu Agara, Horamavu, Bengaluru, Karnataka, India \n\\n",
+    "emp_id": "IIIPL-3185",
+    "emp_name": "SMITHA",
+    "month": "oct",
+    "client": "tesco",
+    "category": "cab",
+    "validation": {
+      "month_match": true,
+      "name_match_score": 100.0,
+      "name_match": true,
+      "address_match_score": 72.22222222222221,
+      "address_match": true,
+      "is_valid": true
+    }
+  },
+  {
+    "filename": "Oct15Morning",
+    "ride_id": "xASuTv78SR",
+    "rider_name": "Smitha",
+    "driver_name": "PRASHA N TH KUMAR",
+    "date": "15/10/2025",
+    "time": "09:26:00",
+    "pickup_address": "2 J9W+VXP, HRBR Layout 1st Block, HRBR Layout, Kalyan Nagar, Bengaluru, Karnataka 560043, India",
+    "drop_address": "Tesco Bengaluru, EPIP Zone, Whitefield, Bengaluru, Karnataka, India",
+    "amount": 554.0,
+    "distance_km": null,
+    "service_provider": null,
+    "ocr": " \nHi Smitha! Here is your driver receipt. \nWed, 15 Oct, 2025 \nPayment Details \n₹ 554 \nBase Fare \n₹ 85 \nDistance Fare \n₹ 397 \nPickup Charges \n₹ 20 \nDriver Addition** \n₹ 10 \nCongestion Charges \n₹ 42 \nFinal Amount Paid \n₹ 554 \nRide Details \nRideID: xASuTv78SR \nDriver  N ame \nPRASHA N TH KUMAR \nLicense Plate \nKA03AM4038 \n09:26  AM \n2 J9W+VXP, HRBR Layout 1st Block, HRBR Layout, Kalyan  N agar, Bengaluru, Karnataka 560043, India \n10:42  AM \nTesco Bengaluru, EPIP Zone, Whitefield, Bengaluru, Karnataka, India \n**Drivers may optionally request 10% of base fare (rounded to nearest Rs.10) to cover other factors like traffic, chances of return trip \netc. \n\\n",
+    "emp_id": "IIIPL-3185",
+    "emp_name": "SMITHA",
+    "month": "oct",
+    "client": "tesco",
+    "category": "cab",
+    "validation": {
+      "month_match": true,
+      "name_match_score": 100.0,
+      "name_match": true,
+      "address_match_score": 75.0,
+      "address_match": true,
+      "is_valid": true
+    }
+  }
+]
