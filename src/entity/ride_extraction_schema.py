@@ -6,6 +6,9 @@ class RideExtraction(BaseModel):
     ride_id: Optional[str]
     rider_name : Optional[str]
     driver_name: Optional[str]
+    day: Optional[str]
+    month: Optional[str]
+    year: Optional[str]
     date: Optional[str]
     time: Optional[str] = None
     pickup_address: Optional[str]

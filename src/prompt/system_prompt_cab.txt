@@ -10,6 +10,9 @@ Fields per object (exact keys and types):
 - ride_id: string or null
 - rider_name : string or null
 - driver_name : string or null
+- day: string or null
+- month: string or null
+- year: string or null
 - date: string in format "DD/MM/YYYY" or null
 - time: string in format "HH:mm:ss" (24h) or null
 - pickup_address: string or null
@@ -24,9 +27,9 @@ Make sure you strictly follow these rules and do not infer anything else:
 2. Use JSON null for missing/uncertain fields.
 3. amount must be a numeric value (no quotes, no currency symbols).
 4. rider_name is the customer name
+5. day, month and year should be extracted individually in numeric format in DD,MM,YYYY format
 5. date MUST be normalized to DD/MM/YYYY.
-   - Add leading zero to day and month.
-   - Convert year to four digits.
+   - concatenate day, month and year in DD/MM/YYYY format
    - If not parseable → null.
 6. time MUST be HH:mm:ss. If seconds missing, use "00". If missing entirely → null.
 7. Do NOT infer or guess ANY field.
