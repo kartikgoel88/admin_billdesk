@@ -70,9 +70,9 @@ class FileUtils:
         emp = folder_name.split("_")
         emp_id = emp[0]
         emp_name = emp[1]
-        month = emp[2]
+        emp_month = emp[2]
         client = emp[3]
-        return Employee(emp_id, emp_name, month, client)
+        return Employee(emp_id, emp_name, emp_month, client)
 
     @staticmethod
     def write_json_to_file(output, file_path):
