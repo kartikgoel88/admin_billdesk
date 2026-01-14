@@ -51,7 +51,7 @@ class FileUtils:
 
         results = []
         for filename in os.listdir(folder_path):
-            if filename.lower().endswith(".pdf"):
+            if filename.lower().endswith((".pdf", ".png", ".jpg")):
                 pdf_path = os.path.join(folder_path, filename)
                 pdf_name = os.path.splitext(filename)[0]
                 print(pdf_name)

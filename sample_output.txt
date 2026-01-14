@@ -1,20 +1,32 @@
 D:\pycharm\admin_billdesk\.venv\Scripts\python.exe D:\pycharm\admin_billdesk\src\app\decision_service.py
-🗂 Prepared [{'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'cab', 'valid_bills': ['FDP0XuJ8oK', 'xASuTv78SR'], 'invalid_bills': [], 'monthly_total': 1010.0}, {'employee_id': 'IIIPL-5030', 'employee_name': 'SIREESHA', 'category': 'cab', 'valid_bills': ['RD17600645766209558', 'RD17600878534951314', 'RD17612917392457647', 'RD17615427980376086', 'RD17615552324814171', 'RD17618876987804019', 'RD17619015438879722'], 'invalid_bills': [], 'monthly_total': 1319.0}] groups for LLM processing.
+🗂 Prepared [{'employee_id': 'IIIPL-1000', 'employee_name': 'naveen', 'category': 'cab', 'valid_bills': [], 'invalid_bills': ['RD17488353151809799'], 'monthly_total': 0}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'cab', 'valid_bills': ['FDP0XuJ8oK', 'xASuTv78SR'], 'invalid_bills': [], 'monthly_total': 1010.0}, {'employee_id': 'IIIPL-5030', 'employee_name': 'SIREESHA', 'category': 'cab', 'valid_bills': ['RD17600645766209558', 'RD17600878534951314', 'RD17612917392457647', 'RD17615427980376086', 'RD17615552324814171', 'RD17618876987804019', 'RD17619015438879722'], 'invalid_bills': [], 'monthly_total': 1319.0}] groups for LLM processing.
 file text loaded successfully:
 
 📄 All Decisions Output:
 [
   {
+    "decision": "REJECT",
+    "employee_id": "IIIPL-1000",
+    "employee_name": "naveen",
+    "valid_bill_ids": [],
+    "invalid_bill_ids": [
+      "RD17488353151809799"
+    ],
+    "reasons": [
+      "Total valid bill amount is 0"
+    ]
+  },
+  {
     "decision": "APPROVE",
     "employee_id": "IIIPL-3185",
-    "employee_name": "SMITHHA",
+    "employee_name": "SMITHA",
     "valid_bill_ids": [
       "FDP0XuJ8oK",
       "xASuTv78SR"
     ],
     "invalid_bill_ids": [],
     "reasons": [
-      "Total valid amount (1010.0) is less than the policy cap (6000) for category 'cab'."
+      "Total valid amount (1010.0) is less than the client location allowance limit (6000)"
     ]
   },
   {
@@ -32,10 +44,11 @@ file text loaded successfully:
     ],
     "invalid_bill_ids": [],
     "reasons": [
-      "Total valid amount (1319.0) is less than the policy cap (6000) for category 'cab'."
+      "Total valid amount (1319.0) is less than the client location allowance limit (6000)"
     ]
   }
 ]
+✅ Copied files for IIIPL-1000_naveen: 0 valid, 1 invalid.
 ✅ Copied files for IIIPL-3185_SMITHA: 2 valid, 0 invalid.
 ✅ Copied files for IIIPL-5030_SIREESHA: 7 valid, 0 invalid.
 
