@@ -6,9 +6,13 @@ from commons.llm_utils import LLMUtils
 from groq import Groq
 import shutil
 
+from commons.config_reader import config
+from commons.constants import Constants as Co
+
+
 if __name__ == "__main__":
     # Collect all ride outputs from output folder matching ridesIIIPL*
-    rides_folder = "src/output"
+    rides_folder = "D:/pycharm/admin_billdesk/src/output"
     bills_map = {}  # key: "emp_id_emp_name", value: list of bills
     bills = []
     for fname in os.listdir(rides_folder):
@@ -34,7 +38,7 @@ if __name__ == "__main__":
 
     # Load policy JSON from output
     policy = FileUtils.load_json_from_file(
-        "src/output/policy.json"
+        "D:/pycharm/admin_billdesk/src/output/policy.json"
     )
 
     if not bills:
@@ -87,21 +91,21 @@ if __name__ == "__main__":
 
     # Load and append system prompt
     system_prompt = FileUtils.load_text_file(
-        "admin_billdesk/src/prompt/system_prompt_decision.txt"
+        "D:/pycharm/admin_billdesk/src/prompt/system_prompt_decision.txt"
     )
 
-    model = "llama-3.3-70b-versatile"
+    model = config[Co.LLM][Co.MODEL],
     client = Groq()
-    output = LLMUtils.call_llm(client, model, system_prompt, user_prompt, 0)
+    output = LLMUtils.call_llm(client, model, system_prompt, user_prompt, config[Co.LLM][Co.TEMPERATURE])
 
     print("\n📄 All Decisions Output:")
     print(output)
 
-    valid_base_dir = "admin_billdesk/src/output/valid_bills"
-    invalid_base_dir = "admin_billdesk/src/output/invalid_bills"
+    valid_base_dir = "D:/pycharm/admin_billdesk/src/output/valid_bills"
+    invalid_base_dir = "D:/pycharm/admin_billdesk/src/output/invalid_bills"
     os.makedirs(valid_base_dir, exist_ok=True)
     os.makedirs(invalid_base_dir, exist_ok=True)
-    src_commute_root = "admin_billdesk/resources/commute"
+    src_commute_root = "D:/pycharm/admin_billdesk/resources/commute"
 
     for emp in save_data:
         emp_id = emp.get("employee_id")

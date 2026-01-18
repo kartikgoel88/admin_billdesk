@@ -5,13 +5,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
 from commons.FileUtils import FileUtils
+from commons.config_reader import config
+from commons.constants import Constants as Co
 
 
 class PolicyExtractor:
     def __init__(self, input_pdf_path, system_prompt_path):
         self.input_pdf_path = input_pdf_path
         self.system_prompt_path = system_prompt_path
-        self.model = "llama-3.3-70b-versatile"
 
     def run(self):
         # Step 1: Extract text from the PDF using existing OCR helper
@@ -29,8 +30,8 @@ class PolicyExtractor:
         ])
 
         llm = ChatGroq(
-            model=self.model,
-            temperature=0
+            model=config[Co.LLM][Co.MODEL],
+            temperature=config[Co.LLM][Co.TEMPERATURE]
         )
 
         parser = StrOutputParser()

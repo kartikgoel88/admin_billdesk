@@ -77,11 +77,13 @@ class FileUtils:
     @staticmethod
     def write_json_to_file(output, file_path):
         data = json.loads(output)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         print(f"data written to {file_path}")
+
 
     @staticmethod
     def load_text_file(file_path):
