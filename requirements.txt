@@ -9,3 +9,4 @@ pydantic~=2.12.4
 langchain-groq
 rapidfuzz
 langchain-openai
+pyyaml

@@ -1,13 +1,18 @@
 import json
 import sys
+import os
+
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from app.validate_commute_fields import ValidateCommuteFeilds
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-
+from commons.constants import Constants as Co
+from commons.config_reader import config
 from commons.FileUtils import FileUtils
 from entity.meal_extraction_schema import MealExtraction, MealExtractionList
-
 
 ## Run command : python src/bill_extractor_tesseract.py D:/pycharm/admin_billdesk/resources/IIIPL-1011_smitha_oct_tesco D:\pycharm\admin_billdesk\src\prompt\system_prompt_cab.txt
 ## export api key via PS :$env:GROQ_API_KEY="API_KEY"
@@ -16,7 +21,9 @@ class MealExtractor:
     def __init__(self,input_folder,system_prompt_path):
         self.input_folder = input_folder
         self.system_prompt_path = system_prompt_path
-
+        self.output_folder = "src/model_output/meal/" + config[Co.LLM][Co.MODEL] + "/"
+        self.employee_meta = FileUtils.extract_info_from_foldername(self.input_folder)
+        self.category = {"category": "meal"}
         # Load receipts from folder
         # Should return a list of:  {"filename": "...", "text": "..."}
         self.receipts = FileUtils.process_folder(self.input_folder)
@@ -28,12 +35,10 @@ class MealExtractor:
         print("\n[Loaded System Prompt]")
         print(self.system_prompt)
 
-        # Choose model
-        self.model_name = "llama-3.3-70b-versatile"
-
+        # Choose model and temperature
         self.llm = ChatGroq(
-            model=self.model_name,
-            temperature=0
+            model=config[Co.LLM][Co.MODEL],
+            temperature=config[Co.LLM][Co.TEMPERATURE],
         )
 
         # Pydantic parser ensures consistency and zero hallucination
@@ -73,23 +78,29 @@ class MealExtractor:
             print("\n✔ Batch Extracted Successfully")
             print(output_data)
 
+            validated_results = []
+
+            for item in output_data:
+                enriched = {
+                    **item.model_dump(),
+                    **self.employee_meta.to_dict(),
+                    **self.category
+                }
+
+                validation = ValidateCommuteFeilds.validate_meal(enriched)
+                enriched["validation"] = validation
+
+                validated_results.append(enriched)
+
             json_output = json.dumps(
-                [item.model_dump() for item in output_data],
+                validated_results,
                 indent=4,
                 ensure_ascii=False
             )
 
-            FileUtils.write_json_to_file(json_output, "meals.json")
-
-            print("\n✅ Saved output to meals.json\n")
-
+            FileUtils.write_json_to_file(json_output, self.output_folder + self.input_folder.split("/")[-1])
         except Exception as e:
             print(f"❌ Error during batch extraction: {e}")
-
-    # ------------------------
-    # Script Entry Point
-    # ------------------------
-
 
 if __name__ == "__main__":
     input_folder = sys.argv[1]
