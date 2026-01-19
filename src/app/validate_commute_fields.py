@@ -75,7 +75,7 @@ class ValidateCommuteFeilds:
         # 1. Month validation
         # -------------------------
         try:
-            ride_month = datetime.strptime(meal_invoice["invoice_date"], "%d/%m/%Y").month
+            ride_month = datetime.strptime(meal_invoice["date"], "%d/%m/%Y").month
             expected_month = MONTH_MAP.get(meal_invoice["emp_month"].lower())
             validations["month_match"] = (ride_month == expected_month)
         except Exception:

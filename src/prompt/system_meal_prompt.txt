@@ -3,11 +3,11 @@
 Extract the following fields and return them as pure JSON:
 
 - filename
-- invoice_number
-- invoice_day
-- invoice_month
-- invoice_year
-- invoice_date
+- id
+- day
+- month
+- year
+- date
 - buyer_name
 - total_amount
 - ocr  (full original OCR text exactly as received)
@@ -16,22 +16,23 @@ Rules:
 1. Do NOT guess any value. If the field is missing or unclear, return null.
 2. total_amount must be a numeric value only (no currency symbol, no commas).
 3. Day,month and year MUST be normalized to strict DD, MM and YYYY format.
-4. invoice_date should be a concat of day/month/year in dd/mm/yyyy format strictly
-4. filename should be returned as passed
-5. Return ONLY valid JSON. No backticks, no explanations, no commentary.
+4. date should be a concat of day/month/year in dd/mm/yyyy format strictly
+5. filename should be returned as passed
+6. amount is the total bill amount
+7. Return ONLY valid JSON. No backticks, no explanations, no commentary.
 
 
 Final output JSON format (strict):
 
 {
   'filename' :
-  'invoice_number':
-  'invoice_day':
-  'invoice_month':
-  'invoice_year':
-  'invoice_date':
+  'id':
+  'day':
+  'month':
+  'year':
+  'date':
   'buyer_name':
-  'total_amount':
+  'amount':
   'ocr':
 }
 """

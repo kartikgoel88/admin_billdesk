@@ -3,7 +3,7 @@ from pydantic import BaseModel, RootModel
 
 class RideExtraction(BaseModel):
     filename: str
-    ride_id: Optional[str]
+    id: Optional[str]
     rider_name : Optional[str]
     driver_name: Optional[str]
     day: Optional[str]
