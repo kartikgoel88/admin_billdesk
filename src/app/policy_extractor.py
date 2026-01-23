@@ -47,7 +47,7 @@ class PolicyExtractor:
         })
 
         # Step 4: Save the JSON output using existing helper
-        FileUtils.write_json_to_file(output, self.root_folder+"src/model_output/"+model_name+"/policy/policy.json")
+        FileUtils.write_json_to_file(output, self.root_folder+"src/model_output/policy/"+model_name+"/policy.json")
 
         print(f"✅ Policy JSON written to policy.json from: {self.input_pdf_path}")
 
