@@ -1,11 +1,15 @@
 D:\pycharm\admin_billdesk\.venv\Scripts\python.exe D:\pycharm\admin_billdesk\src\app\decision_service.py
-🗂 Prepared [{'employee_id': 'IIIPL-1000', 'employee_name': 'naveen', 'category': 'cab', 'date': None, 'valid_bills': [], 'invalid_bills': ['RD17488353151809799'], 'daily_total': None, 'monthly_total': 0}, {'employee_id': 'IIIPL-1011', 'employee_name': 'smitha', 'category': 'cab', 'date': None, 'valid_bills': [], 'invalid_bills': ['CRN9560890336', '3s3v78rSaF', 'KMNHIAC24484158', 'HR2501734A000711', 'FFJHFDDC25000010'], 'daily_total': None, 'monthly_total': 0}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'cab', 'date': None, 'valid_bills': ['FDP0XuJ8oK', 'xASuTv78SR'], 'invalid_bills': [], 'daily_total': None, 'monthly_total': 1010.0}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'meal', 'date': '30/07/2025', 'valid_bills': ['JUIQIT323151S', 'DOSXNV50443S'], 'invalid_bills': [], 'daily_total': 75.6, 'monthly_total': None}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'meal', 'date': '08/07/2025', 'valid_bills': ['JUIQIT313692S', 'COONND1443S'], 'invalid_bills': [], 'daily_total': 248.75, 'monthly_total': None}, {'employee_id': 'IIIPL-5030', 'employee_name': 'SIREESHA', 'category': 'cab', 'date': None, 'valid_bills': ['RD17600645766209558', 'RD17600878534951314', 'RD17612917392457647', 'RD17615427980376086', 'RD17615552324814171', 'RD17618876987804019', 'RD17619015438879722'], 'invalid_bills': [], 'daily_total': None, 'monthly_total': 1319.0}, {'employee_id': 'IIIPL-5653', 'employee_name': 'ashwini', 'category': 'cab', 'date': None, 'valid_bills': ['RD17313323427215751', 'RD17315579158315167', 'RD17315907206185320', 'RD17321585542843974', 'RD17321854214454215', 'RD17322466992750953', 'RD17327642156571431', 'RD17328020445687517'], 'invalid_bills': ['RD17438357860089080', 'RD17506969273550314', None], 'daily_total': None, 'monthly_total': 1269.0}] groups for LLM processing.
+⚠️ Failed to load commute/invalid_bills: [Errno 13] Permission denied: 'D:/pycharm/admin_billdesk/src/model_output\\commute/llama-3.3-70b-versatile\\invalid_bills'
+⚠️ Failed to load commute/valid_bills: [Errno 13] Permission denied: 'D:/pycharm/admin_billdesk/src/model_output\\commute/llama-3.3-70b-versatile\\valid_bills'
+⚠️ Failed to load meal/invalid_bills: [Errno 13] Permission denied: 'D:/pycharm/admin_billdesk/src/model_output\\meal/llama-3.3-70b-versatile\\invalid_bills'
+⚠️ Failed to load meal/valid_bills: [Errno 13] Permission denied: 'D:/pycharm/admin_billdesk/src/model_output\\meal/llama-3.3-70b-versatile\\valid_bills'
+🗂 Prepared [{'employee_id': 'IIIPL-1000', 'employee_name': 'naveen', 'category': 'cab', 'date': None, 'valid_bills': [], 'invalid_bills': ['RD17488353151809799'], 'daily_total': None, 'monthly_total': 0}, {'employee_id': 'IIIPL-1011', 'employee_name': 'smitha', 'category': 'cab', 'date': None, 'valid_bills': [], 'invalid_bills': ['CRN9560890336', '3s3v78rSaF', 'KMNHIAC24484158', 'HR2501734A000711', 'FFJHFDDC25000010'], 'daily_total': None, 'monthly_total': 0}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'cab', 'date': None, 'valid_bills': ['FDP0XuJ8oK', 'xASuTv78SR'], 'invalid_bills': [], 'daily_total': None, 'monthly_total': 1010.0}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'meal', 'date': '30/07/2025', 'valid_bills': ['JUIQIT323151S', 'DOSXNV50443S'], 'invalid_bills': [], 'daily_total': 75.6, 'monthly_total': None}, {'employee_id': 'IIIPL-3185', 'employee_name': 'SMITHA', 'category': 'meal', 'date': '08/07/2025', 'valid_bills': ['JUIQIT313692S', 'COONND1443S'], 'invalid_bills': [], 'daily_total': 248.75, 'monthly_total': None}, {'employee_id': 'IIIPL-5030', 'employee_name': 'SIREESHA', 'category': 'cab', 'date': None, 'valid_bills': ['RD17600645766209558', 'RD17600878534951314', 'RD17612917392457647', 'RD17615427980376086', 'RD17615552324814171', 'RD17618876987804019', 'RD17619015438879722'], 'invalid_bills': [], 'daily_total': None, 'monthly_total': 1319.0}, {'employee_id': 'IIIPL-5653', 'employee_name': 'ashwini', 'category': 'cab', 'date': None, 'valid_bills': ['RD17313323427215751', 'RD17315579158315167', 'RD17315907206185320', 'RD17321585542843974', 'RD17321854214454215', 'RD17322466992750953', 'RD17327642156571431', 'RD17328020445687517'], 'invalid_bills': ['RD17438357860089080', 'RD17506969273550314', 'MANUAL-receipt_9ed71f8b-428d-4d31-8743-c3dda2c2e686-651dd358-d499-4624-af36-10a48373e00f'], 'daily_total': None, 'monthly_total': 1269.0}] groups for LLM processing.
 file text loaded successfully:
 
 📄 All Decisions Output:
 [
   {
-    "decision": "REJECT",
+    "decision": "APPROVE",
     "employee_id": "IIIPL-1000",
     "employee_name": "naveen",
     "category": "cab",
@@ -18,7 +22,7 @@ file text loaded successfully:
     ]
   },
   {
-    "decision": "REJECT",
+    "decision": "APPROVE",
     "employee_id": "IIIPL-1011",
     "employee_name": "smitha",
     "category": "cab",
@@ -113,7 +117,7 @@ file text loaded successfully:
     "invalid_bill_ids": [
       "RD17438357860089080",
       "RD17506969273550314",
-      null
+      "MANUAL-receipt_9ed71f8b-428d-4d31-8743-c3dda2c2e686-651dd358-d499-4624-af36-10a48373e00f"
     ],
     "reasons": [
       "Total valid bill amount for the month of 1269.0 is less than the client location allowance limit of 6000 INR per month."

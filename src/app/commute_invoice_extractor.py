@@ -79,13 +79,24 @@ class CommuteExtractor:
 
             output_data = result.root  # List[RideExtraction]
             print("\n✔ Batch Extracted Successfully")
-            print(output_data)
+            #print(output_data)
 
             validated_results = []
 
+            self.ocr_lookup = {}
+
+            for rec in self.receipts:
+                for filename, ocr_text in rec.items():
+                    self.ocr_lookup[filename] = ocr_text
+
             for item in output_data:
+                base = item.model_dump()
+
+                filename = base.get("filename")
+                ocr_text = self.ocr_lookup.get(filename)
                 enriched = {
-                    **item.model_dump(),
+                    **base,
+                    "ocr": ocr_text,
                     **self.employee_meta.to_dict(),
                     **self.category
                 }
