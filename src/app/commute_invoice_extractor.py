@@ -30,6 +30,12 @@ class CommuteExtractor:
         self.receipts = FileUtils.process_folder(self.input_folder)
         print("\n[Receipts loaded]")
 
+        self.ocr_lookup = {}
+
+        for rec in self.receipts:
+            for filename, ocr_text in rec.items():
+                self.ocr_lookup[filename] = ocr_text
+
         with open("clients.json", "r", encoding="utf-8") as f:
             self.client_addresses = json.load(f)
 
@@ -79,15 +85,8 @@ class CommuteExtractor:
 
             output_data = result.root  # List[RideExtraction]
             print("\n✔ Batch Extracted Successfully")
-            #print(output_data)
 
             validated_results = []
-
-            self.ocr_lookup = {}
-
-            for rec in self.receipts:
-                for filename, ocr_text in rec.items():
-                    self.ocr_lookup[filename] = ocr_text
 
             for item in output_data:
                 base = item.model_dump()

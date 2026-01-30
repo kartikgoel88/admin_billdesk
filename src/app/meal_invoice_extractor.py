@@ -30,10 +30,15 @@ class MealExtractor:
         print("\n[Receipts loaded]")
         print(self.receipts)
 
+        self.ocr_lookup = {}
+
+        for rec in self.receipts:
+            for filename, ocr_text in rec.items():
+                self.ocr_lookup[filename] = ocr_text
+
         # Load system prompt
         self.system_prompt = FileUtils.load_text_file(self.system_prompt_path)
         print("\n[Loaded System Prompt]")
-        print(self.system_prompt)
 
         # Choose model and temperature
         self.llm = ChatGroq(
@@ -81,8 +86,13 @@ class MealExtractor:
             validated_results = []
 
             for item in output_data:
+                base = item.model_dump()
+
+                filename = base.get("filename")
+                ocr_text = self.ocr_lookup.get(filename)
                 enriched = {
-                    **item.model_dump(),
+                    **base,
+                    "ocr": ocr_text,
                     **self.employee_meta.to_dict(),
                     **self.category
                 }
