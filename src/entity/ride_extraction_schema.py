@@ -16,7 +16,6 @@ class RideExtraction(BaseModel):
     amount: Optional[float]
     distance_km: Optional[float] = None
     service_provider: Optional[str]
-    ocr: Optional[str]
 
 
 class RideExtractionList(RootModel[list[RideExtraction]]):

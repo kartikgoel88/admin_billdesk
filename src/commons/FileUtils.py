@@ -65,7 +65,7 @@ class FileUtils:
     def extract_info_from_foldername(folder_path: str):
         if not os.path.isdir(folder_path):
             raise ValueError(f"Not a folder: {folder_path}")
-
+        folder_path = os.path.abspath(folder_path)
         folder_name = os.path.basename(folder_path)
         emp = folder_name.split("_")
         emp_id = emp[0]

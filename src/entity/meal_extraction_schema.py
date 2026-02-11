@@ -10,7 +10,6 @@ class MealExtraction(BaseModel):
     date:Optional[str]
     buyer_name: Optional[str]
     amount : float
-    ocr: Optional[str]
 
 
 class MealExtractionList(RootModel[list[MealExtraction]]):

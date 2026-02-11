@@ -1,5 +1,5 @@
 from datetime import datetime
-
+import uuid
 from rapidfuzz import fuzz
 
 MONTH_MAP = {
@@ -8,12 +8,15 @@ MONTH_MAP = {
     "sep": 9, "oct": 10, "nov": 11, "dec": 12
 }
 
+MANUAL = "MANUAL"
 class ValidateCommuteFeilds:
 
     @staticmethod
     def validate_ride(ride: dict, client_addresses: dict) -> dict:
         validations = {}
 
+        if ride["id"] is None:
+            ride["id"] = MANUAL + "-" + ride["filename"] + "-" + str(uuid.uuid4())
         # -------------------------
         # 1. Month validation
         # -------------------------
@@ -71,6 +74,8 @@ class ValidateCommuteFeilds:
     def validate_meal(meal_invoice: dict) -> dict:
         validations = {}
 
+        if meal_invoice["id"] is None:
+            meal_invoice["id"] = MANUAL + "-" + meal_invoice["filename"] + "-" + str(uuid.uuid4())
         # -------------------------
         # 1. Month validation
         # -------------------------

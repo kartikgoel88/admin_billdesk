@@ -20,7 +20,6 @@ Fields per object (exact keys and types):
 - amount: number (no currency symbols, no commas) or null
 - distance: string or null
 - service_provider must be one of: "Ola", "Uber", "Rapido", "Nammayatri". Return these value only if any of these strings are clearly found in the text, otherwise strictly return null
-- ocr: (string) must be the full OCR text exactly as provided, with newline characters escaped as "\\n"
 
 Make sure you strictly follow these rules and do not infer anything else:
 1. Output must be exactly one JSON array: `[ {...}, {...} ]`
@@ -38,6 +37,5 @@ Make sure you strictly follow these rules and do not infer anything else:
      like 'km', 'KM', 'kilometers', 'mi', 'miles'.
    - Do not calculate distance by the fare per km and total fare, this is a strict rule
 9. Id is the bill id or the id number available in the text for the particular cab journey
-10. `ocr` must include the provided OCR text with newlines replaced by "\\n".
-11. Do NOT output anything except the JSON array. No markdown or commentary.
+10. Do NOT output anything except the JSON array. No markdown or commentary.
 """
