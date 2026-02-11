@@ -10,3 +10,4 @@ langchain-groq
 rapidfuzz
 langchain-openai
 pyyaml
+PyMuPDF
