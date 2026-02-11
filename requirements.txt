@@ -11,3 +11,9 @@ rapidfuzz
 langchain-openai
 pyyaml
 PyMuPDF
+
+# RAG dependencies (optional - install only if using --enable-rag)
+# pip install faiss-cpu sentence-transformers langchain-community
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.2
+langchain-community>=0.0.10
