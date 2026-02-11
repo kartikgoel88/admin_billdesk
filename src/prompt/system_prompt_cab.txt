@@ -18,6 +18,7 @@ Fields per object (exact keys and types):
 - pickup_address: string or null
 - drop_address: string or null
 - amount: number (no currency symbols, no commas) or null
+- currency: string or null (e.g. INR, USD from receipt)
 - distance: string or null
 - service_provider must be one of: "Ola", "Uber", "Rapido", "Nammayatri". Return these value only if any of these strings are clearly found in the text, otherwise strictly return null
 

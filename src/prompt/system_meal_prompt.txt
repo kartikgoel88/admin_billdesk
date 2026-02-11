@@ -9,11 +9,12 @@ Extract the following fields and return them as pure JSON:
 - year
 - date
 - buyer_name
-- total_amount
+- amount (total bill amount, numeric only)
+- currency (e.g. INR, USD, EUR from receipt; null if not found)
 
 Rules:
 1. Do NOT guess any value. If the field is missing or unclear, return null.
-2. total_amount must be a numeric value only (no currency symbol, no commas).
+2. amount must be a numeric value only (no currency symbol, no commas).
 3. Day,month and year MUST be normalized to strict DD, MM and YYYY format.
 4. date should be a concat of day/month/year in dd/mm/yyyy format strictly
 5. filename should be returned as passed
@@ -32,5 +33,6 @@ Final output JSON format (strict):
   'date':
   'buyer_name':
   'amount':
+  'currency':
 }
 """

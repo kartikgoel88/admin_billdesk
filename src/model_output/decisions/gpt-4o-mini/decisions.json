@@ -1,0 +1,49 @@
+[
+  {
+    "decision": "APPROVE",
+    "employee_id": "IIIPL-3185",
+    "employee_name": "SMITHA",
+    "category": "commute",
+    "valid_bill_ids": [
+      "FDP0XuJ8oK",
+      "xASuTv78SR"
+    ],
+    "invalid_bill_ids": [],
+    "claimed_amount": 1010.0,
+    "approved_amount": 1010.0,
+    "currency": "INR",
+    "reasons": []
+  },
+  {
+    "decision": "APPROVE",
+    "employee_id": "IIIPL-3185",
+    "employee_name": "smitha",
+    "category": "meal",
+    "valid_bill_ids": [
+      "MANUAL-31st_Lunch-ee492b4e-75db-4136-be31-71aa753bb927",
+      "MANUAL-31st_Lunch_1-529a076a-7615-4c4e-b330-e1cd6a862f3c"
+    ],
+    "invalid_bill_ids": [],
+    "claimed_amount": 75.6,
+    "approved_amount": 75.6,
+    "currency": "INR",
+    "reasons": []
+  },
+  {
+    "decision": "APPROVE",
+    "employee_id": "IIIPL-3185",
+    "employee_name": "smitha",
+    "category": "meal",
+    "valid_bill_ids": [
+      "MANUAL-July8th_Lunch_1-afb8b295-a4f2-49dd-b035-c6f7c5bfa991",
+      "MANUAL-July8th_Lunch-dbb57f5d-73ab-4f14-891f-9860079b5578"
+    ],
+    "invalid_bill_ids": [],
+    "claimed_amount": 203.75,
+    "approved_amount": 125.0,
+    "currency": "INR",
+    "reasons": [
+      "Daily total 203.75 capped at policy limit 125 INR; approved with reimbursable_daily_total 125."
+    ]
+  }
+]

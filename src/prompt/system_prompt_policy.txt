@@ -15,13 +15,15 @@ Return ONLY valid JSON.
     "limit": <numeric_limit>,
     "unit": "<currency> per km",
     "grade": "<grade_applicability>",
-    "max_per_month": <numeric_limit>
+    "max_per_month": <numeric_limit>,
+    "max_per_bill": <numeric_limit>
   },
   "fuel_reimbursement_four_wheeler": {
     "limit": <numeric_limit>,
     "unit": "<currency> per km",
     "grade": "<grade_applicability>",
-    "max_per_month": <numeric_limit>
+    "max_per_month": <numeric_limit>,
+    "max_per_bill": <numeric_limit>
   },
   "meal_allowance": {
     "limit": <numeric_limit>,
@@ -34,4 +36,6 @@ Rules:
 - Ensure all numeric limits are numbers (no commas or currency symbols).
 - Units should be standardized into "INR per month", "INR per km", or "INR per day".
 - Grade applicability should be extracted from the policy (e.g., "all", "Grade A", "Grade C", etc.).
+- max_per_bill: maximum reimbursable amount per fuel bill (single receipt). Omit if policy does not specify; validation will fall back to max_per_month or config.
+- meal_allowance.limit is the maximum per day (used as per-bill cap when validating meal bills).
 - Output must be valid JSON format. No trailing commas, no markdown, no wrapping, only the JSON object.

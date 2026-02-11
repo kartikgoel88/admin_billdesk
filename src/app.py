@@ -27,12 +27,13 @@ from langchain_groq import ChatGroq
 from commons.constants import Constants as Co
 from commons.FileUtils import FileUtils
 from commons.config_reader import config
+from commons.llm import get_llm_model_name
 
-# Reuse existing extractors
-from app.commute_invoice_extractor import CommuteExtractor
-from app.meal_invoice_extractor import MealExtractor
-from app.policy_extractor import PolicyExtractor as BasePolicyExtractor
-from app.decision_engine import DecisionEngine  # Import DecisionEngine from separate file
+# Extendible extractors and decision engine
+from app.extractors import CommuteExtractor, MealExtractor, get_extractor
+from app.extractors.policy_extractor import PolicyExtractor as BasePolicyExtractor
+from app.decision import DecisionEngine
+from app.org_api import get_org_client
 
 
 # =============================================================================
@@ -42,14 +43,15 @@ from app.decision_engine import DecisionEngine  # Import DecisionEngine from sep
 @dataclass
 class AppConfig:
     """Application configuration loaded from config.yaml"""
-    resources_dir: str ="resources"
-    output_dir: str = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),"src/model_output")
-    model_name: str = field(default_factory=lambda: config[Co.LLM][Co.MODEL])
-    temperature: float = field(default_factory=lambda: config[Co.LLM][Co.TEMPERATURE])
+    resources_dir: str = field(default_factory=lambda: (config.get("paths") or {}).get("resources_dir", "resources"))
+    output_dir: str = field(default_factory=lambda: (config.get("paths") or {}).get("output_dir", "src/model_output"))
+    model_name: str = field(default_factory=get_llm_model_name)
+    temperature: float = field(default_factory=lambda: (config.get(Co.LLM) or {}).get(Co.TEMPERATURE, 0))
     enable_rag: bool = field(default_factory=lambda: config.get("rag", {}).get("enabled", False))
     rag_chunk_size: int = field(default_factory=lambda: config.get("rag", {}).get("chunk_size", 500))
     rag_chunk_overlap: int = field(default_factory=lambda: config.get("rag", {}).get("chunk_overlap", 50))
     rag_top_k: int = field(default_factory=lambda: config.get("rag", {}).get("top_k", 5))
+    rag_embedding_model: str = field(default_factory=lambda: config.get("rag", {}).get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2"))
 
 
 # =============================================================================
@@ -84,7 +86,7 @@ class RAGPolicyExtractor:
 
             # Create embeddings and vector store
             self.embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
+                model_name=self.config.rag_embedding_model
             )
             self.vector_store = FAISS.from_texts(chunks, self.embeddings)
 
@@ -185,13 +187,15 @@ class BillDeskApp:
         self.decision_engine = None  # Initialized after policy extraction
 
         self.all_bills = {}  # key: "emp_id_emp_name", value: list of bills
+        self.employee_org_data = {}  # key: "emp_id_emp_name", value: org API response or None (optional enrichment)
+        self.policy = None  # extracted policy JSON (used for validation limits and decision engine)
 
     def discover_employees(self) -> Dict[str, Dict[str, str]]:
         """Discover all employee folders in resources"""
         employees = {}
 
-        for category in ["commute", "meal"]:
-            category_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),self.config.resources_dir, category)
+        for category in ["commute", "meal", "fuel"]:
+            category_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), self.config.resources_dir, category)
             if not os.path.exists(category_path):
                 continue
 
@@ -200,7 +204,6 @@ class BillDeskApp:
                 if not os.path.isdir(folder_path):
                     continue
 
-                # Parse employee info from folder name
                 parts = folder_name.split("_")
                 if len(parts) >= 4:
                     emp_id = parts[0]
@@ -208,8 +211,7 @@ class BillDeskApp:
                     key = f"{emp_id}_{emp_name}"
 
                     if key not in employees:
-                        employees[key] = {"commute": None, "meal": None}
-
+                        employees[key] = {"commute": None, "meal": None, "fuel": None}
                     employees[key][category] = folder_path
 
         return employees
@@ -217,41 +219,38 @@ class BillDeskApp:
     def process_employee(self, emp_key: str, folders: Dict[str, str]) -> List[Dict]:
         """
         Process all invoices for a single employee.
-        Reuses CommuteExtractor and MealExtractor classes.
+        Uses extractor registry: add new categories via register_extractor().
         """
         print(f"\n{'=' * 60}")
         print(f"👤 Processing employee: {emp_key}")
         print(f"{'=' * 60}")
 
         results = []
+        prompt_dir = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "src", "prompt")
+        category_to_prompt = {
+            "commute": os.path.join(prompt_dir, "system_prompt_cab.txt"),
+            "meal": os.path.join(prompt_dir, "system_meal_prompt.txt"),
+            "fuel": os.path.join(prompt_dir, "system_prompt_fuel.txt"),
+        }
+        category_labels = {"commute": "🚗 commute", "meal": "🍽️ meal", "fuel": "⛽ fuel"}
 
-        # Process commute invoices using existing CommuteExtractor
-        if folders.get("commute") and (not self.args.category or self.args.category == "commute"):
-            print(f"\n🚗 Processing commute invoices from: {folders['commute']}")
-
-            commute_extractor = CommuteExtractor(
-                input_folder=folders["commute"],
-                system_prompt_path=os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),"src/prompt/system_prompt_cab.txt")
+        for category in ["commute", "meal", "fuel"]:
+            if not folders.get(category) or (self.args.category and self.args.category != category):
+                continue
+            folder_path = folders[category]
+            extractor = get_extractor(
+                category,
+                input_folder=folder_path,
+                system_prompt_path=category_to_prompt.get(category),
+                policy=self.policy,
             )
-            commute_results = commute_extractor.run(save_to_file=True)
-
-            if commute_results:
-                results.extend(commute_results)
-                print(f"✅ Extracted {len(commute_results)} commute invoices")
-
-        # Process meal invoices using existing MealExtractor
-        if folders.get("meal") and (not self.args.category or self.args.category == "meal"):
-            print(f"\n🍽️ Processing meal invoices from: {folders['meal']}")
-
-            meal_extractor = MealExtractor(
-                input_folder=folders["meal"],
-                system_prompt_path=os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),"src/prompt/system_meal_prompt.txt")
-            )
-            meal_results = meal_extractor.run(save_to_file=True)
-
-            if meal_results:
-                results.extend(meal_results)
-                print(f"✅ Extracted {len(meal_results)} meal invoices")
+            if not extractor:
+                continue
+            print(f"\n{category_labels.get(category, category)} invoices from: {folder_path}")
+            category_results = extractor.run(save_to_file=True)
+            if category_results:
+                results.extend(category_results)
+                print(f"✅ Extracted {len(category_results)} {category} invoices")
 
         return results
 
@@ -271,11 +270,12 @@ class BillDeskApp:
             policy_path = os.path.join(self.config.resources_dir, "policy", "company_policy.pdf")
 
         policy_prompt_path = "src/prompt/system_prompt_policy.txt"
-        policy = self.policy_extractor.extract(policy_path, policy_prompt_path)
+        self.policy = self.policy_extractor.extract(policy_path, policy_prompt_path)
 
-        if not policy:
+        if not self.policy:
             print("❌ Failed to extract policy. Exiting.")
             return
+        policy = self.policy  # alias for decision engine call below
 
         # Initialize decision engine with direct parameters from separate module
         # Pass policy_extractor only if RAG is enabled
@@ -305,24 +305,42 @@ class BillDeskApp:
 
         print(f"\n📊 Found {len(employees)} employee(s) to process")
 
-        # Step 3: Process each employee using reused extractors
+        # Optional: fetch org data (employee details, leave, manager) for enrichment; not mandatory
+        org_client = get_org_client()
+        if org_client:
+            print("📡 Org API enabled: fetching employee/leave/manager data for enrichment")
         for emp_key, folders in employees.items():
-            results = self.process_employee(emp_key, folders)
+            if org_client:
+                emp_id = emp_key.split("_", 1)[0]
+                try:
+                    self.employee_org_data[emp_key] = org_client.get_employee_details(emp_id)
+                except Exception:
+                    self.employee_org_data[emp_key] = None
 
+            results = self.process_employee(emp_key, folders)
             if results:
                 self.all_bills[emp_key] = results
 
-        # Step 4: Run decision engine
+        # Step 4: Run decision engine (optionally with org data for enrichment)
         if self.all_bills and not self.args.skip_decision:
-            decisions = self.decision_engine.run(self.all_bills, policy)
+            decisions = self.decision_engine.run(
+                self.all_bills,
+                policy,
+                employee_org_data=self.employee_org_data if self.employee_org_data else None,
+            )
 
-            # Save decisions
+            decisions_dir = os.path.dirname(f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions.json")
+            os.makedirs(decisions_dir, exist_ok=True)
             if decisions:
                 decisions_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions.json"
-                os.makedirs(os.path.dirname(decisions_path), exist_ok=True)
                 with open(decisions_path, "w", encoding="utf-8") as f:
                     json.dump(decisions, f, indent=2)
                 print(f"\n💾 Decisions saved to: {decisions_path}")
+            if self.employee_org_data:
+                org_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/employee_org_data.json"
+                with open(org_path, "w", encoding="utf-8") as f:
+                    json.dump(self.employee_org_data, f, indent=2)
+                print(f"💾 Employee org data (enrichment) saved to: {org_path}")
 
         print("\n" + "=" * 60)
         print("✅ Processing complete!")
@@ -369,7 +387,7 @@ Examples:
 
     parser.add_argument(
         "--category",
-        choices=["commute", "meal"],
+        choices=["commute", "meal", "fuel"],
         help="Process only specific category"
     )
 

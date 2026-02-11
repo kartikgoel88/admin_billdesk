@@ -1,10 +1,5 @@
-import yaml
-from pathlib import Path
+"""Backward-compatible config access. Prefer commons.config for new code."""
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / 'config' / "config.yaml"
+from commons.config import config, load_config
 
-def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-config = load_config()
+__all__ = ["config", "load_config"]

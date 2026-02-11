@@ -1,4 +1,6 @@
 numpy~=1.26.4
+pytest>=7.0.0
+pytest-cov>=4.0.0
 pytesseract~=0.3.13
 opencv-python~=4.6.0.66
 groq~=0.35.0
@@ -7,13 +9,18 @@ langchain-core
 psycopg2-binary~=2.9.11
 pydantic~=2.12.4
 langchain-groq
-rapidfuzz
 langchain-openai
+langchain-anthropic
+rapidfuzz
 pyyaml
 PyMuPDF
+requests>=2.28.0
 
 # RAG dependencies (optional - install only if using --enable-rag)
 # pip install faiss-cpu sentence-transformers langchain-community
 faiss-cpu>=1.7.4
 sentence-transformers>=2.2.2
 langchain-community>=0.0.10
+
+# SharePoint sync (optional - for scripts/sync_sharepoint_to_resources.py)
+Office365-REST-Python-Client>=2.5.0

@@ -1,0 +1,35 @@
+[project]
+name = "admin-billdesk"
+version = "0.1.0"
+description = "Invoice processing: commute, meal, fuel extraction and validation with LLM decision engine"
+readme = "readme.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26.4,<2",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytesseract>=0.3.13",
+    "opencv-python>=4.6.0.66",
+    "groq>=0.35.0",
+    "langchain",
+    "langchain-core",
+    "psycopg2-binary>=2.9.11",
+    "pydantic>=2.12.4",
+    "langchain-groq",
+    "langchain-openai",
+    "langchain-anthropic",
+    "rapidfuzz",
+    "pyyaml",
+    "PyMuPDF",
+    "requests>=2.28.0",
+    "langchain-community>=0.0.10",
+]
+
+[project.optional-dependencies]
+rag = [
+    "faiss-cpu>=1.7.4",
+    "sentence-transformers>=2.2.2",
+]
+sharepoint = [
+    "Office365-REST-Python-Client>=2.5.0",
+]

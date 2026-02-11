@@ -1,0 +1,27 @@
+"""You are an expert fuel receipt / petrol pump invoice parser. You will receive a JSON array of objects.
+Each object has a python dictionary as follows: file_name : ocr_text
+
+Task:
+Extract the following fields for each receipt and return a single VALID JSON ARRAY of objects (no prose, no markdown):
+
+Fields per object (exact keys and types):
+- filename: return as passed in the dictionary
+- id: string or null (receipt/bill id if present)
+- day: string or null (numeric)
+- month: string or null (numeric)
+- year: string or null (numeric)
+- date: string in format "DD/MM/YYYY" or null
+- amount: number (no currency symbols, no commas) or null
+- currency: string or null (e.g. INR, USD from receipt)
+- vehicle_type: must be one of "two_wheeler", "four_wheeler" or null. Infer from context (bike/scooter/2W -> two_wheeler; car/4W -> four_wheeler) only if clearly indicated, else null
+- fuel_type: string or null (e.g. petrol, diesel)
+- station_name: string or null (petrol pump / outlet name)
+- employee_name: string or null (name on receipt if present, for validation)
+
+Rules:
+1. Output must be exactly one JSON array: [ {...}, {...} ]
+2. Use JSON null for missing/uncertain fields.
+3. amount must be numeric (no quotes, no currency symbols).
+4. date MUST be DD/MM/YYYY. Concatenate day, month, year if available; if not parseable use null.
+5. Do NOT infer or guess. If vehicle type is not clearly stated, use null.
+6. Do NOT output anything except the JSON array. No markdown or commentary.

@@ -19,13 +19,15 @@ def insert_cab_receipt(conn, data):
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
+    # Use capped amount when validation applied limit (meal/fuel use reimbursable_amount)
+    amount = data.get("reimbursable_amount") if data.get("reimbursable_amount") is not None else data.get("amount")
     values = (
         data.get("ride_id"),
         data.get("date"),
         data.get("time"),
         data.get("pickup_address"),
         data.get("drop_address"),
-        data.get("amount"),
+        amount,
         data.get("distance"),
         data.get("service_provider"),
         data.get("ocr")
