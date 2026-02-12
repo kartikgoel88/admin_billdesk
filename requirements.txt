@@ -11,6 +11,7 @@ pydantic~=2.12.4
 langchain-groq
 langchain-openai
 langchain-anthropic
+langchain-ollama
 rapidfuzz
 pyyaml
 PyMuPDF

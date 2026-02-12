@@ -111,7 +111,7 @@ def _build_azure(model: str, temperature: float, api_key: str, provider_cfg: dic
 
 def _build_ollama(model: str, temperature: float, api_key: str, provider_cfg: dict | None = None, **kwargs) -> Any:
     """Local LLM via Ollama. No API key needed. Set llm.providers.ollama.base_url if not localhost:11434."""
-    from langchain_community.chat_models.ollama import ChatOllama
+    from langchain_ollama import ChatOllama
     provider_cfg = provider_cfg or {}
     base_url = provider_cfg.get("base_url") or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
     return ChatOllama(
