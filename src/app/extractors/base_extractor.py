@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -16,7 +17,7 @@ from app.validation import get_validator
 
 
 def _extract_json_from_llm_output(text: str) -> str | None:
-    """Try to get valid JSON from LLM output (handles markdown code blocks and stray text)."""
+    """Try to get valid JSON from LLM output (handles markdown code blocks, stray text, and common mistakes)."""
     if not text or not isinstance(text, str):
         return None
     s = text.strip()
@@ -31,15 +32,37 @@ def _extract_json_from_llm_output(text: str) -> str | None:
         return s
     except (json.JSONDecodeError, TypeError):
         pass
-    # Try to find a JSON array or object in the string
+    # Fix common LLM mistakes: single-quoted keys/strings (Python-style) -> double quotes for JSON
+    # Only replace ' with " when it looks like a key or simple string boundary (greedy match from start of key)
+    try:
+        fixed = re.sub(r"'([^']*)'\s*:", r'"\1":', s)
+        if fixed != s:
+            json.loads(fixed)
+            return fixed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    # Try to find a JSON array first (expected for meal/cab), then a single object
     for pattern in (r"\[[\s\S]*\]", r"\{[\s\S]*\}"):
         match = re.search(pattern, s)
         if match:
+            candidate = match.group(0)
             try:
-                json.loads(match.group(0))
-                return match.group(0)
+                json.loads(candidate)
+                return candidate
             except (json.JSONDecodeError, TypeError):
-                continue
+                try:
+                    fixed = re.sub(r"'([^']*)'\s*:", r'"\1":', candidate)
+                    json.loads(fixed)
+                    return fixed
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                # Last resort: Python literal (single quotes, True/False, etc.)
+                try:
+                    parsed = ast.literal_eval(candidate)
+                    if isinstance(parsed, (list, dict)):
+                        return json.dumps(parsed)
+                except (ValueError, SyntaxError, TypeError):
+                    continue
     return None
 
 
