@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from langchain_core.output_parsers import BaseOutputParser, PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -14,6 +15,34 @@ from app.extractors._paths import output_dir, project_path
 from app.validation import get_validator
 
 
+def _extract_json_from_llm_output(text: str) -> str | None:
+    """Try to get valid JSON from LLM output (handles markdown code blocks and stray text)."""
+    if not text or not isinstance(text, str):
+        return None
+    s = text.strip()
+    # Remove markdown code fences (e.g. ```json ... ``` or ``` ... ```)
+    if "```" in s:
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)```", s)
+        if match:
+            s = match.group(1).strip()
+    # Try direct parse first
+    try:
+        json.loads(s)
+        return s
+    except (json.JSONDecodeError, TypeError):
+        pass
+    # Try to find a JSON array or object in the string
+    for pattern in (r"\[[\s\S]*\]", r"\{[\s\S]*\}"):
+        match = re.search(pattern, s)
+        if match:
+            try:
+                json.loads(match.group(0))
+                return match.group(0)
+            except (json.JSONDecodeError, TypeError):
+                continue
+    return None
+
+
 class _ListNormalizingParser(BaseOutputParser):
     """Wraps PydanticOutputParser: if LLM returns a single object, wrap it in a list before parsing."""
 
@@ -22,13 +51,24 @@ class _ListNormalizingParser(BaseOutputParser):
         self._parser = PydanticOutputParser(pydantic_object=pydantic_object)
 
     def parse(self, text: str):
+        raw = text.strip() if text else ""
+        json_str = _extract_json_from_llm_output(raw)
+        if json_str is None:
+            snippet = (raw[:200] + "…") if len(raw) > 200 else raw
+            raise ValueError(
+                "Invalid JSON output from model. Response must be valid JSON (or JSON inside markdown code blocks). "
+                f"Got: {snippet!r}"
+            )
         try:
-            data = json.loads(text.strip())
+            data = json.loads(json_str)
             if isinstance(data, dict):
                 data = [data]
             normalized = json.dumps(data)
-        except (json.JSONDecodeError, TypeError):
-            normalized = text
+        except (json.JSONDecodeError, TypeError) as e:
+            snippet = (raw[:200] + "…") if len(raw) > 200 else raw
+            raise ValueError(
+                f"Invalid JSON output from model: {e}. Response snippet: {snippet!r}"
+            ) from e
         return self._parser.parse(normalized)
 
     def get_format_instructions(self) -> str:
