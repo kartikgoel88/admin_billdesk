@@ -1,0 +1,28 @@
+[
+  {
+    "filename": "AugMealReceipts",
+    "id": "MANUAL-AugMealReceipts-ce03dc47-7c43-4a41-90e9-26a297e023b8",
+    "day": "29",
+    "month": "08",
+    "year": "2025",
+    "date": "29/08/2025",
+    "buyer_name": null,
+    "amount": 158.0,
+    "currency": null,
+    "ocr": "< _—— Receipts\n\n§2025=08=18t)2025208=31 (Ratings) (Amount )\n\n#95232620\n2158\n158\n\nAug 29, 15:00\n1 Mini Meal Veg\nTotal\n\n\n<< Receipts\n\nAug 25, 15:00 #94434859\n21-Mini Meal. Veg =158-\nTotal T1538)\n\nAug 22, 15:00. #94283403 |\n-1.Mini Meal. Veg '=15g8:\nTotal 3158:\n\nEmail receipt | ‘Reorder’ |\n\nAug‘20, 15:00 ‘#93866913.\n1. Mini Meal Veg iss:\nTotal F158.\n\nAug'18, 15:00 #93476464\n1 Mini Meal Veg. F158.\nTotal F158\n\n| Email receipt: ‘Reorder’ al Rate order’ |\n: a °\n\n",
+    "emp_id": "NAVEEN",
+    "emp_name": "naveen",
+    "emp_month": "unknown",
+    "client": "unknown",
+    "category": "meal",
+    "reimbursable_amount": 125.0,
+    "amount_capped": true,
+    "amount_original": 158.0,
+    "validation": {
+      "month_match": true,
+      "name_match_score": 0.0,
+      "name_match": false,
+      "is_valid": false
+    }
+  }
+]

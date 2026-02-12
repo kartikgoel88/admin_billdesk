@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,6 +17,23 @@ from commons.llm import get_llm
 
 # Resolve project root from app/decision/engine.py -> app -> src -> project
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+_DATE_FMT = "%d/%m/%Y"
+_MONTH_FMT = "%Y-%m"
+
+
+def _month_from_bills(bills: List[Dict], date_key: str = "date") -> str:
+    """Derive YYYY-MM from first bill that has a parseable date; else 'unknown'."""
+    for b in bills or []:
+        date_val = b.get(date_key)
+        if not date_val:
+            continue
+        try:
+            dt = datetime.strptime(str(date_val).strip(), _DATE_FMT)
+            return dt.strftime(_MONTH_FMT)
+        except (ValueError, TypeError):
+            continue
+    return "unknown"
 
 
 class DecisionEngine:
@@ -85,11 +103,16 @@ class DecisionEngine:
                 if category == "meal" and daily_totals:
                     for date, total in daily_totals.items():
                         date_bills = [b for b in valid_bills if b.get("date") == date]
+                        try:
+                            month = datetime.strptime(date, _DATE_FMT).strftime(_MONTH_FMT)
+                        except (ValueError, TypeError):
+                            month = _month_from_bills(date_bills)
                         groups_data.append({
                             "employee_id": emp_id,
                             "employee_name": emp_name,
                             "category": category,
                             "date": date,
+                            "month": month,
                             "valid_bills": [b.get("id") for b in valid_bills if b.get("date") == date],
                             "invalid_bills": [b.get("id") for b in invalid_bills if b.get("date") == date],
                             "daily_total": total,
@@ -97,11 +120,13 @@ class DecisionEngine:
                             "currency": _currency_from_bills(date_bills) or group_currency,
                         })
                 else:
+                    month = _month_from_bills(cat_bills)
                     groups_data.append({
                         "employee_id": emp_id,
                         "employee_name": emp_name,
                         "category": category,
                         "date": None,
+                        "month": month,
                         "valid_bills": [b.get("id") for b in valid_bills],
                         "invalid_bills": [b.get("id") for b in invalid_bills],
                         "daily_total": None,
@@ -208,6 +233,8 @@ class DecisionEngine:
                         item["approved_amount"] = float(item["approved_amount"])
                     except (TypeError, ValueError):
                         item["approved_amount"] = 0
+                # Month from bills (set in _prepare_groups)
+                item["month"] = group.get("month", "unknown")
             return decisions
         except json.JSONDecodeError:
             print("⚠️ Could not parse decision output as JSON")

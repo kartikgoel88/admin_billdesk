@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.output_parsers import BaseOutputParser, PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from commons.FileUtils import FileUtils
@@ -12,6 +12,27 @@ from commons.llm import get_llm, get_llm_model_name
 
 from app.extractors._paths import output_dir, project_path
 from app.validation import get_validator
+
+
+class _ListNormalizingParser(BaseOutputParser):
+    """Wraps PydanticOutputParser: if LLM returns a single object, wrap it in a list before parsing."""
+
+    def __init__(self, pydantic_object: type):
+        super().__init__()
+        self._parser = PydanticOutputParser(pydantic_object=pydantic_object)
+
+    def parse(self, text: str):
+        try:
+            data = json.loads(text.strip())
+            if isinstance(data, dict):
+                data = [data]
+            normalized = json.dumps(data)
+        except (json.JSONDecodeError, TypeError):
+            normalized = text
+        return self._parser.parse(normalized)
+
+    def get_format_instructions(self) -> str:
+        return self._parser.get_format_instructions()
 
 
 class BaseInvoiceExtractor:
@@ -51,7 +72,7 @@ class BaseInvoiceExtractor:
         print("\n[Loaded System Prompt]")
 
         self.llm = get_llm()
-        self.parser = PydanticOutputParser(pydantic_object=schema_class)
+        self.parser = _ListNormalizingParser(schema_class)
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", "{system_prompt}"),
             (

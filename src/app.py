@@ -1,11 +1,15 @@
 """
 BillDesk - Unified Invoice Processing Application
 
-This application processes employee expense invoices (commute and meal),
+This application processes employee expense invoices (commute, meal, fuel),
 validates them, extracts policies, and runs them through a decision engine.
 
+By default reads from the standardized processed folder (paths.processed_dir,
+e.g. resources/processed_inputs). Use --resources-dir to point at raw resources.
+
 Usage:
-    python src/app.py --resources-dir resources --enable-rag
+    python src/app.py
+    python src/app.py --resources-dir resources/processed_inputs
     python src/app.py --employee IIIPL-1000_naveen_oct_amex --category commute
 """
 
@@ -40,10 +44,16 @@ from app.org_api import get_org_client
 # Configuration
 # =============================================================================
 
+def _default_resources_dir() -> str:
+    """Default: standardized processed inputs (processed_dir), else raw resources_dir."""
+    paths = config.get("paths") or {}
+    return paths.get("processed_dir") or paths.get("resources_dir", "resources")
+
+
 @dataclass
 class AppConfig:
     """Application configuration loaded from config.yaml"""
-    resources_dir: str = field(default_factory=lambda: (config.get("paths") or {}).get("resources_dir", "resources"))
+    resources_dir: str = field(default_factory=_default_resources_dir)
     output_dir: str = field(default_factory=lambda: (config.get("paths") or {}).get("output_dir", "src/model_output"))
     model_name: str = field(default_factory=get_llm_model_name)
     temperature: float = field(default_factory=lambda: (config.get(Co.LLM) or {}).get(Co.TEMPERATURE, 0))
@@ -140,14 +150,12 @@ class PolicyExtractorWithRAG:
             print("🔍 RAG mode enabled for policy extraction")
 
     def extract(self, policy_path: str, system_prompt_path: str) -> Dict:
-        """Extract policy from PDF using existing PolicyExtractor"""
+        """Extract policy from PDF using existing PolicyExtractor (policy_path is under app resources_dir)."""
         print(f"\n📋 Extracting policy from: {policy_path}")
         root_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        # Use the existing PolicyExtractor class
-        print("root_folder:", root_folder)
         extractor = BasePolicyExtractor(
             root_folder=root_folder + "/",
-            input_pdf_path=os.path.join(root_folder, policy_path),
+            input_pdf_path=policy_path if os.path.isabs(policy_path) else os.path.join(root_folder, policy_path),
             system_prompt_path=os.path.join(root_folder, system_prompt_path)
         )
 
@@ -264,10 +272,18 @@ class BillDeskApp:
         print(f"🔍 RAG Enabled: {self.config.enable_rag}")
         print("=" * 60)
 
-        # Step 1: Extract policy using existing PolicyExtractor (wrapped with RAG support)
-        policy_path = os.path.join(self.config.resources_dir, "company_policy.pdf")
-        if not os.path.exists(policy_path):
-            policy_path = os.path.join(self.config.resources_dir, "policy", "company_policy.pdf")
+        # Step 1: Extract policy — look under resources_dir first, then fall back to raw resources (policy often lives there)
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        raw_resources = (config.get("paths") or {}).get("resources_dir", "resources")
+        for base in (self.config.resources_dir, raw_resources):
+            policy_path = os.path.join(project_root, base, "company_policy.pdf")
+            if os.path.exists(policy_path):
+                break
+            policy_path = os.path.join(project_root, base, "policy", "company_policy.pdf")
+            if os.path.exists(policy_path):
+                break
+        else:
+            policy_path = os.path.join(project_root, self.config.resources_dir, "policy", "company_policy.pdf")
 
         policy_prompt_path = "src/prompt/system_prompt_policy.txt"
         self.policy = self.policy_extractor.extract(policy_path, policy_prompt_path)
@@ -290,12 +306,19 @@ class BillDeskApp:
 
         # Step 2: Discover and process employees
         if self.args.employee:
-            # Process specific employee
+            # Process specific employee (match on full key or name; keys are e.g. IIIPL-3185_smitha or SMITHA_smitha from folder names)
             employees = self.discover_employees()
-            matching = {k: v for k, v in employees.items() if self.args.employee.lower() in k.lower()}
-
+            needle = self.args.employee.lower()
+            matching = {k: v for k, v in employees.items() if needle in k.lower()}
+            # If no match, try matching by name only (e.g. "smitha" matches SMITHA_smitha when folders use name as id)
+            if not matching and "_" in self.args.employee:
+                name_part = self.args.employee.rsplit("_", 1)[-1].lower()
+                matching = {k: v for k, v in employees.items() if name_part in k.lower()}
             if not matching:
+                available = ", ".join(sorted(employees.keys())) if employees else "(none)"
                 print(f"❌ No employee found matching: {self.args.employee}")
+                print(f"   Available keys (from folder names under {self.config.resources_dir}/commute|meal|fuel): {available}")
+                print(f"   Tip: use --employee <key> or just the name, e.g. --employee smitha")
                 return
 
             employees = matching
@@ -332,10 +355,40 @@ class BillDeskApp:
             decisions_dir = os.path.dirname(f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions.json")
             os.makedirs(decisions_dir, exist_ok=True)
             if decisions:
+                # Group by name -> category -> month (each leaf is a list of decision objects)
+                grouped = {}
+                for d in decisions:
+                    name = f"{d.get('employee_id', '')}_{d.get('employee_name', '')}"
+                    cat = d.get("category", "unknown")
+                    month = d.get("month", "unknown")
+                    grouped.setdefault(name, {}).setdefault(cat, {}).setdefault(month, []).append(d)
                 decisions_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions.json"
                 with open(decisions_path, "w", encoding="utf-8") as f:
-                    json.dump(decisions, f, indent=2)
-                print(f"\n💾 Decisions saved to: {decisions_path}")
+                    json.dump(grouped, f, indent=2)
+                print(f"\n💾 Decisions saved to: {decisions_path} (grouped by name → category → month)")
+
+                # Summary by employee → category → month (summed amounts for admin validation)
+                summary = {}
+                for name, by_cat in grouped.items():
+                    summary[name] = {}
+                    for cat, by_month in by_cat.items():
+                        summary[name][cat] = {}
+                        for month, items in by_month.items():
+                            total_claimed = sum(float(d.get("claimed_amount") or 0) for d in items)
+                            total_approved = sum(float(d.get("approved_amount") or 0) for d in items)
+                            any_reject = any((d.get("decision") or "").upper() == "REJECT" for d in items)
+                            currency = (items[0].get("currency") or "INR") if items else "INR"
+                            summary[name][cat][month] = {
+                                "decision": "REJECT" if any_reject else "APPROVE",
+                                "claimed_amount": round(total_claimed, 2),
+                                "approved_amount": round(total_approved, 2),
+                                "currency": currency,
+                                "decision_count": len(items),
+                            }
+                summary_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions_summary.json"
+                with open(summary_path, "w", encoding="utf-8") as f:
+                    json.dump(summary, f, indent=2)
+                print(f"💾 Decisions summary saved to: {summary_path} (month-wise sums per employee for admin)")
             if self.employee_org_data:
                 org_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/employee_org_data.json"
                 with open(org_path, "w", encoding="utf-8") as f:
@@ -374,10 +427,12 @@ Examples:
         """
     )
 
+    paths_cfg = config.get("paths") or {}
+    default_resources = paths_cfg.get("processed_dir") or paths_cfg.get("resources_dir", "resources")
     parser.add_argument(
         "--resources-dir",
-        default="resources",
-        help="Path to resources directory (default: resources)"
+        default=default_resources,
+        help="Path to resources directory (default: paths.processed_dir from config, e.g. resources/processed_inputs)"
     )
 
     parser.add_argument(
@@ -404,12 +459,9 @@ Examples:
     )
 
     args = parser.parse_args()
-    # Run application
-    args.resources_dir=os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),"resources")
-    args.employee = "IIIPL-3185_smitha"
-    #args.category = "meal"
-    #args.employee = "IIIPL-5653_ashwini"
-    #args.category = "commute"
+    # Run application (default: process all employees; use --employee to limit)
+    # args.employee = "IIIPL-3185_smitha"   # uncomment to process only one employee
+    # args.category = "meal"               # uncomment to process only one category
     app = BillDeskApp(args)
     app.run()
 

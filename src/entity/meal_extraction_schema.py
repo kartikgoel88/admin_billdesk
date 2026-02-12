@@ -2,7 +2,7 @@ from typing import Optional
 from pydantic import BaseModel, RootModel
 
 class MealExtraction(BaseModel):
-    filename: str
+    filename: Optional[str] = None  # LLM may omit; enrich/validation can use receipt context
     id: Optional[str] = None
     day: Optional[str] = None
     month: Optional[str] = None
