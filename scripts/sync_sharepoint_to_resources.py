@@ -13,6 +13,7 @@ Two modes:
 2) Local mode (--local): reads from local resources (e.g. resources/ashwini/cab/, ...),
    builds the same folder naming, and copies files into paths.processed_dir
    (e.g. resources/processed_inputs/commute/..., meal/..., fuel/...).
+   Supports employee folder as .zip (e.g. resources/kartik.zip): extracted to temp and walked.
    Zips are copied then unzipped into the destination (name has meal and month in path).
    The app can then use --resources-dir resources/processed_inputs to pick from there.
 
@@ -36,6 +37,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -305,37 +307,81 @@ def _build_standard_name_for_local(emp_name: str, category: str) -> str:
     return f"{emp_id}_{name_part}_{month}_{client}"
 
 
+def _local_file_to_category(filename: str) -> Optional[str]:
+    """Infer category from filename (e.g. cab.zip -> commute, meals.zip -> meal)."""
+    stem = Path(filename).stem.lower()
+    return _local_folder_to_category(stem)
+
+
+def _walk_one_employee_dir(
+    emp_dir: Path,
+    emp_name: str,
+    bill_extensions: Tuple[str, ...],
+) -> List[Tuple[str, str, str, List[str]]]:
+    """Collect (emp_name, category, folder_path, file_paths) from one employee dir (or extracted zip)."""
+    results: List[Tuple[str, str, str, List[str]]] = []
+    # 1) Subfolders named by category (cab, meals, etc.) with bill/archive files inside
+    for sub in emp_dir.iterdir():
+        if not sub.is_dir():
+            continue
+        category = _local_folder_to_category(sub.name)
+        if not category:
+            continue
+        files = [
+            str(p) for p in sub.iterdir()
+            if p.is_file() and (
+                any(p.name.lower().endswith(ext) for ext in bill_extensions)
+                or p.name.lower().endswith(_archive_extensions())
+            )
+        ]
+        if files:
+            results.append((emp_name, category, str(sub), files))
+    # 2) Category-named files directly in employee folder (e.g. kartik/cab.zip)
+    for f in emp_dir.iterdir():
+        if not f.is_file() or f.name.startswith("."):
+            continue
+        if not (
+            any(f.name.lower().endswith(ext) for ext in bill_extensions)
+            or f.name.lower().endswith(_archive_extensions())
+        ):
+            continue
+        category = _local_file_to_category(f.name)
+        if not category:
+            continue
+        results.append((emp_name, category, str(emp_dir), [str(f)]))
+    return results
+
+
 def walk_local_folders(
     resources_root: str,
     bill_extensions: Tuple[str, ...],
 ) -> List[Tuple[str, str, str, List[str]]]:
     """
-    Walk resources_root (e.g. resources/). Yields (emp_name, category, folder_path, [file paths]).
-    Expects structure: resources/{emp_name}/{category_folder}/files.
+    Walk resources_root (e.g. resources/). Returns (emp_name, category, folder_path, [file paths]).
+    Supports:
+      - resources/{emp_name}/{category_folder}/files   (e.g. smitha/cab/*.pdf, smitha/meals/*.pdf)
+      - resources/{emp_name}/{category_file}          (e.g. kartik/cab.zip at employee level)
+      - resources/{emp_name}.zip                      (employee folder as zip; extracted to temp and walked)
     """
     results: List[Tuple[str, str, str, List[str]]] = []
     resources_path = Path(resources_root)
     if not resources_path.is_dir():
         return results
-    for emp_dir in resources_path.iterdir():
-        if not emp_dir.is_dir() or emp_dir.name.startswith("."):
+    for emp_entry in resources_path.iterdir():
+        if emp_entry.name.startswith("."):
             continue
-        emp_name = emp_dir.name
-        for sub in emp_dir.iterdir():
-            if not sub.is_dir():
-                continue
-            category = _local_folder_to_category(sub.name)
-            if not category:
-                continue
-            files = [
-                str(p) for p in sub.iterdir()
-                if p.is_file() and (
-                    any(p.name.lower().endswith(ext) for ext in bill_extensions)
-                    or p.name.lower().endswith(_archive_extensions())
+        if emp_entry.is_dir():
+            emp_name = emp_entry.name
+            results.extend(_walk_one_employee_dir(emp_entry, emp_name, bill_extensions))
+        elif emp_entry.is_file() and emp_entry.name.lower().endswith(_archive_extensions()):
+            # 3) Employee folder as zip (e.g. resources/kartik.zip)
+            emp_name = emp_entry.stem
+            with tempfile.TemporaryDirectory(prefix="sync_emp_") as tmp:
+                with zipfile.ZipFile(emp_entry, "r") as zf:
+                    zf.extractall(tmp)
+                results.extend(
+                    _walk_one_employee_dir(Path(tmp), emp_name, bill_extensions)
                 )
-            ]
-            if files:
-                results.append((emp_name, category, str(sub), files))
     return results
 
 
