@@ -23,6 +23,7 @@ dependencies = [
     "PyMuPDF",
     "requests>=2.28.0",
     "langchain-community>=0.0.10",
+    "Office365-REST-Python-Client>=2.5.0",
 ]
 
 [project.optional-dependencies]

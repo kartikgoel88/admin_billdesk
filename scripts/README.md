@@ -25,6 +25,12 @@ Usage:
 
 Then set `llm.provider: ollama` in `src/config/config.yaml` and run the app.
 
-## Other
+## SharePoint sync
 
-- **`sync_sharepoint_to_resources.py`** – Sync bills from SharePoint into local resources (optional; requires Office365-REST-Python-Client and credentials).
+- **`sync_sharepoint_to_resources.py`** – Two modes:
+  - **SharePoint (default):** Sync bills from SharePoint into local `resources/commute`, `resources/meal`, and `resources/fuel`. Reads `src/config/config.yaml` (sharepoint, paths, folder); env vars: `SHAREPOINT_SITE_URL`, `SHAREPOINT_ROOT`, `SHAREPOINT_USERNAME`, `SHAREPOINT_PASSWORD`. Folder names normalized to `{emp_id}_{emp_name}_{month}_{client}`. Install: `pip install -e ".[sharepoint]"`. Run: `python scripts/sync_sharepoint_to_resources.py`.
+  - **Local (`--local`):** Read from local `resources` (structure: `resources/<emp_name>/<cab|meals|...>/files`), write to `paths.processed_dir` (default `resources/processed_inputs`) with the same category and standard folder naming. No SharePoint credentials needed. Then run the app with `--resources-dir resources/processed_inputs` to use the processed folder.
+  ```bash
+  python scripts/sync_sharepoint_to_resources.py --local
+  python src/app.py --resources-dir resources/processed_inputs
+  ```

@@ -16,15 +16,31 @@ apps:
 paths:
   clients_file: clients.json
   resources_dir: resources
+  processed_dir: resources/processed_inputs   # local sync writes here; app can use --resources-dir <this>
   output_dir: src/model_output
 
 # SharePoint sync (used by scripts/sync_sharepoint_to_resources.py)
-# Set credentials via env: SHAREPOINT_USERNAME, SHAREPOINT_PASSWORD (or use app-only auth)
+# Credentials: set env SHAREPOINT_USERNAME, SHAREPOINT_PASSWORD (required for user auth).
+# Overrides: SHAREPOINT_SITE_URL and SHAREPOINT_ROOT override site_url and root_folder below.
 sharepoint:
   site_url: ""                    # e.g. https://yourtenant.sharepoint.com/sites/YourSite
   root_folder: ""                 # server-relative path, e.g. /sites/YourSite/Shared Documents/Bills
   default_client: "unknown"       # used when client cannot be inferred from folder name
-  employee_mapping_file: ""       # optional JSON: {"Display Name": "IIIPL-1234", ...}
+  default_month: "unknown"       # for local mode when month not in path
+  employee_mapping_file: ""       # optional JSON path (project-relative): {"Display Name": "IIIPL-1234", ...}
+  # Categories synced into paths.resources_dir: commute, meal, fuel (folder names normalized to {emp_id}_{emp_name}_{month}_{client})
+  categories:
+    commute:
+      keywords: ["cab", "taxi", "commute", "ride", "uber", "ola", "transport"]
+    meal:
+      keywords: ["meal", "meals", "food", "lunch", "dinner"]
+    fuel:
+      keywords: ["fuel", "petrol", "diesel", "gas"]
+  # Map path substring (lowercase) -> client id for folder naming
+  client_keywords:
+    tesco: "tesco"
+    amex: "amex"
+    "american express": "amex"
 
 validation:
   name_match_threshold: 75

@@ -30,7 +30,7 @@ Process employee expense invoices (commute, meal, fuel), validate against policy
 
 | Layer | Role |
 |-------|------|
-| **Config** (`src/config/config.yaml`) | Paths, LLM provider/model, validation thresholds, per-bill limits (fallback when not in policy), folder parser and OCR settings, RAG options. |
+| **Config** (`src/config/config.yaml`) | Paths, LLM provider/model, validation thresholds, per-bill limits (fallback when not in policy), folder parser and OCR settings, RAG options, SharePoint sync (site, root, categories, client keywords). |
 | **Commons** (`src/commons/`) | Config loading, file I/O, OCR (Tesseract), folder parsing (`{emp_id}_{emp_name}_{month}_{client}`), folder processing. All pluggable via protocols. |
 | **App – extractors** (`src/app/extractors/`) | **Commute**, **Meal**, **Fuel** extractors (OCR + LLM → structured list). **Policy** extractor (PDF → policy JSON). Path helpers in `_paths.py` (project root, config-aware output dir). |
 | **App – validation** (`src/app/validation/`) | **Ride** (commute), **Meal**, **Fuel** validators. Month/name/address checks; meal/fuel use policy (or config) for `amount_limit_per_bill` and set `reimbursable_amount`. |
@@ -60,7 +60,9 @@ python src/app.py --enable-rag
 2. In `src/config/config.yaml` set `llm.provider: ollama` (and optionally `llm.providers.ollama.model`).
 3. Run the app with `./scripts/run_app.sh` or `python scripts/run_app.py`.
 
-Config: `src/config/config.yaml` (paths, LLM provider/model, validation thresholds, per-bill limits, OCR, etc.).
+Config: `src/config/config.yaml` (paths, LLM provider/model, validation thresholds, per-bill limits, OCR, SharePoint sync, etc.).
+
+**SharePoint sync (optional):** To pull bills from SharePoint into `resources/commute`, `resources/meal`, and `resources/fuel`, configure `sharepoint` in config and set env vars for credentials; then run `python scripts/sync_sharepoint_to_resources.py`. See `scripts/README.md`.
 
 ---
 
