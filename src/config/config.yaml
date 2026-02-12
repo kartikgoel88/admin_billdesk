@@ -69,9 +69,9 @@ ocr:
 # API key: set env var (api_key_env) and/or api_key here. Env takes precedence.
 # Use provider: ollama for local models (no API key; run scripts/run_local_llm.sh first).
 llm:
-  provider: ollama
+  provider: openai
   temperature: 0
-  default_model: llama3.2
+  default_model: gpt-4o-mini
   providers:
     ollama:
       model: llama3.2              # e.g. llama3.2, mistral, codellama
@@ -82,8 +82,8 @@ llm:
       api_key: ""                  # optional: set key in config (prefer env for security)
     openai:
       model: gpt-4o-mini
-      api_key_env: 
-      api_key: 
+      api_key_env: OPENAI_API_KEY   # set this env var with your key; do not put the key in this file
+      api_key: "" 
     anthropic:
       model: claude-3-5-sonnet-20241022
       api_key_env: ANTHROPIC_API_KEY
