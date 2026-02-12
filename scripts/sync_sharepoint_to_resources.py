@@ -8,10 +8,12 @@ Two modes:
      resources/commute/...
      resources/meal/...
      resources/fuel/...
+   Zips are detected and unzipped into the same folder (folder name includes category and month).
 
 2) Local mode (--local): reads from local resources (e.g. resources/ashwini/cab/, ...),
    builds the same folder naming, and copies files into paths.processed_dir
    (e.g. resources/processed_inputs/commute/..., meal/..., fuel/...).
+   Zips are copied then unzipped into the destination (name has meal and month in path).
    The app can then use --resources-dir resources/processed_inputs to pick from there.
 
 Configuration is read from src/config/config.yaml (sharepoint, paths, folder).
@@ -34,6 +36,7 @@ import json
 import os
 import re
 import shutil
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -87,6 +90,11 @@ def _bill_extensions_from_config() -> Tuple[str, ...]:
     folder_cfg = _config().get("folder") or {}
     exts = folder_cfg.get("bill_extensions") or [".pdf", ".png", ".jpg", ".jpeg"]
     return tuple(exts)
+
+
+def _archive_extensions() -> Tuple[str, ...]:
+    """Extensions treated as archives (downloaded and unzipped); destination path has category and month in name."""
+    return (".zip",)
 
 
 def _sharepoint_settings() -> Dict[str, Any]:
@@ -235,12 +243,28 @@ def build_standard_folder_name(sp_folder_url: str, category: str) -> Optional[st
     return f"{emp_id}_{emp_name}_{month}_{client}"
 
 
-def download_file(ctx: "ClientContext", sp_file, dest_folder: str):
+def download_file(ctx: "ClientContext", sp_file, dest_folder: str) -> str:
+    """Download file to dest_folder. Returns path to the downloaded file."""
     os.makedirs(dest_folder, exist_ok=True)
     local_path = os.path.join(dest_folder, sp_file.name)
     print(f"  → {sp_file.name}")
     with open(local_path, "wb") as f:
         sp_file.download(f).execute_query()
+    return local_path
+
+
+def _is_archive(filename: str) -> bool:
+    return filename.lower().endswith(_archive_extensions())
+
+
+def unzip_into(zip_path: str, dest_folder: str, remove_zip: bool = True) -> None:
+    """Extract zip_path into dest_folder. Optionally remove the zip after extraction."""
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        names = zf.namelist()
+        zf.extractall(dest_folder)
+    print(f"    unzipped {len(names)} file(s)")
+    if remove_zip:
+        os.remove(zip_path)
 
 
 def _category_to_local_dir(category: str) -> str:
@@ -305,7 +329,10 @@ def walk_local_folders(
                 continue
             files = [
                 str(p) for p in sub.iterdir()
-                if p.is_file() and any(p.name.lower().endswith(ext) for ext in bill_extensions)
+                if p.is_file() and (
+                    any(p.name.lower().endswith(ext) for ext in bill_extensions)
+                    or p.name.lower().endswith(_archive_extensions())
+                )
             ]
             if files:
                 results.append((emp_name, category, str(sub), files))
@@ -326,6 +353,8 @@ def copy_local_to_processed(
         if src != dest:
             shutil.copy2(src, dest)
             print(f"  → {name}")
+        if _is_archive(name):
+            unzip_into(dest, dest_dir, remove_zip=True)
 
 
 def main_local() -> None:
@@ -366,6 +395,7 @@ def main():
 
     ctx = get_ctx()
     bill_extensions = _bill_extensions_from_config()
+    archive_exts = _archive_extensions()
 
     print(f"Walking SharePoint: {root_folder}")
     folder_entries = walk_sharepoint_folders(ctx, root_folder)
@@ -375,7 +405,7 @@ def main():
             continue
         bill_files = [
             f for f in files
-            if f.name.lower().endswith(bill_extensions)
+            if f.name.lower().endswith(bill_extensions) or f.name.lower().endswith(archive_exts)
         ]
         if not bill_files:
             continue
@@ -394,10 +424,12 @@ def main():
         dest_base = _category_to_local_dir(category)
         dest_emp_folder = os.path.join(dest_base, std_folder_name)
         print(f"\n{folder_url}")
-        print(f"  → {std_folder_name}")
+        print(f"  → {std_folder_name}  (category and month in folder name)")
 
         for sp_file in bill_files:
-            download_file(ctx, sp_file, dest_emp_folder)
+            local_path = download_file(ctx, sp_file, dest_emp_folder)
+            if _is_archive(sp_file.name):
+                unzip_into(local_path, dest_emp_folder, remove_zip=True)
 
     resources_dir = (config.get("paths") or {}).get("resources_dir", "resources")
     print(f"\nDone. Check {resources_dir}/commute, {resources_dir}/meal, {resources_dir}/fuel.")
