@@ -55,6 +55,8 @@ python src/app.py --employee IIIPL-1000_naveen_oct_amex --category commute
 python src/app.py --enable-rag
 ```
 
+**Run modes:** Default is the full pipeline (policy → extract → validate → decision). Use `--skip-decision` to run only extraction and validation; use `--decision-only` to skip OCR and validations and run only the decision engine, loading policy and bills from the existing `output_dir` (e.g. `resources/model_output`).
+
 **Local LLM (Ollama):**
 1. Install [Ollama](https://ollama.com) and run: `./scripts/run_local_llm.sh [model] [--serve]` to pull a model (e.g. `llama3.2`) and optionally start the API server.
 2. In `src/config/config.yaml` set `llm.provider: ollama` (and optionally `llm.providers.ollama.model`).

@@ -170,6 +170,40 @@ class TestMealValidator:
         assert bill["reimbursable_amount"] == 300
         assert bill.get("amount_capped") is not True
 
+    def test_rupee_misread_7_corrected_from_ocr(self):
+        """When amount is 7 (rupee symbol misread), correct from OCR Total/₹/Rs."""
+        v = MealValidator()
+        bill = {
+            "filename": "m.pdf",
+            "date": "10/03/2025",
+            "emp_month": "mar",
+            "emp_name": "jane",
+            "buyer_name": "Jane",
+            "amount": 7,
+            "ocr": "Bill Total: ₹450.00\nThank you.",
+        }
+        result = v.validate(bill)
+        assert result.get("amount_rupee_corrected") is True
+        assert bill["amount"] == 450.0
+        assert bill["reimbursable_amount"] == 450.0
+
+    def test_rupee_misread_ocr_has_2_or_7_as_symbol(self):
+        """When OCR itself read ₹ as 2 or 7 (e.g. '2 500' or '7 1,200'), we still extract the real amount."""
+        v = MealValidator()
+        bill = {
+            "filename": "m.pdf",
+            "date": "10/03/2025",
+            "emp_month": "mar",
+            "emp_name": "jane",
+            "buyer_name": "Jane",
+            "amount": 2,  # model also got 2 (rupee misread)
+            "ocr": "Amount payable: 2 500.00\nThank you.",  # no Rs/₹; OCR has "2 500"
+        }
+        result = v.validate(bill)
+        assert result.get("amount_rupee_corrected") is True
+        assert bill["amount"] == 500.0
+        assert bill["reimbursable_amount"] == 500.0
+
 
 class TestRideValidator:
     def test_valid_ride_with_address_match(self):

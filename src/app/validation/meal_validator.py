@@ -4,6 +4,7 @@ from rapidfuzz import fuzz
 
 from app.validation._common import (
     apply_amount_cap,
+    correct_rupee_misread,
     ensure_bill_id,
     get_validation_params,
     month_match,
@@ -28,6 +29,12 @@ class MealValidator:
         validations["name_match"] = name_score >= params["name_match_threshold"]
 
         amount = parse_amount(meal_invoice.get("amount"))
+        ocr_text = meal_invoice.get("ocr")
+        corrected = correct_rupee_misread(amount, meal_invoice.get("amount"), ocr_text)
+        if corrected is not None:
+            amount = corrected
+            meal_invoice["amount"] = amount
+            validations["amount_rupee_corrected"] = True
         apply_amount_cap(meal_invoice, amount, params.get("amount_limit_per_bill"))
 
         validations["is_valid"] = validations["month_match"] and validations["name_match"]

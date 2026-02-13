@@ -185,8 +185,18 @@ class DecisionEngine:
         bills_map: Dict[str, List[Dict]],
         policy: Dict,
         employee_org_data: Optional[Dict[str, Any]] = None,
+        category_filter: Optional[str] = None,
     ) -> List[Dict]:
-        print("\n⚖️ Running decision engine...")
+        """Run decision engine on bills. If category_filter is set (commute/meal/fuel), only that category is processed."""
+        if category_filter:
+            bills_map = {
+                k: [b for b in v if (b.get("category") or "").strip().lower() == category_filter.lower()]
+                for k, v in bills_map.items()
+            }
+            bills_map = {k: v for k, v in bills_map.items() if v}
+            print(f"\n⚖️ Running decision engine for category: {category_filter}...")
+        else:
+            print("\n⚖️ Running decision engine...")
         if not bills_map:
             print("❌ No bills to process")
             return []

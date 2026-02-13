@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -23,6 +24,66 @@ def parse_amount(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+# Amounts that often mean OCR misread rupee symbol (₹) as digit
+_SUSPICIOUS_AMOUNTS_RUPEE_MISREAD = (2, 7, 2.0, 7.0)
+
+
+def _extract_amounts_from_ocr(ocr_text: str) -> list[float]:
+    """Extract numeric amounts from OCR that appear in rupee context (₹, Rs, INR, total, amount).
+    Also handles when OCR has already read the rupee symbol as 2 or 7 (e.g. '2 500' or '7 1,200').
+    """
+    if not ocr_text or not isinstance(ocr_text, str):
+        return []
+    text = ocr_text.strip()
+    amounts: list[float] = []
+    # Patterns: ₹ 500, Rs. 500, Rs 500, INR 500, 500/-, Total 500, Amount 500, total: 500
+    # Plus: OCR read ₹ as 2 or 7 -> "2 500", "7 1,200" (lone 2/7 then space then amount)
+    patterns = [
+        r"[₹]\s*([\d,]+(?:\.\d{1,2})?)",
+        r"Rs\.?\s*([\d,]+(?:\.\d{1,2})?)",
+        r"INR\s*([\d,]+(?:\.\d{1,2})?)",
+        r"([\d,]+(?:\.\d{1,2})?)\s*\/?-",
+        r"(?:total|amount|grand total|payable)[\s:]*([\d,]+(?:\.\d{1,2})?)",
+        r"\b[27]\s+([\d,]+(?:\.\d{1,2})?)",  # OCR read ₹ as 2 or 7: "2 500", "7 1,200"
+    ]
+    for pat in patterns:
+        for m in re.finditer(pat, text, re.IGNORECASE):
+            try:
+                s = m.group(1).replace(",", "").strip()
+                if s:
+                    amounts.append(float(s))
+            except (ValueError, IndexError):
+                continue
+    return amounts
+
+
+def correct_rupee_misread(
+    parsed_amount: float | None,
+    raw_amount_value: Any,
+    ocr_text: str | None,
+) -> float | None:
+    """
+    If parsed amount is 2 or 7 (common rupee symbol ₹ misread), try to get the real amount from OCR.
+    Returns corrected amount if a plausible one is found in OCR, else None (caller keeps parsed_amount).
+    """
+    if parsed_amount is None or ocr_text is None:
+        return None
+    try:
+        p = float(parsed_amount)
+    except (TypeError, ValueError):
+        return None
+    if p not in _SUSPICIOUS_AMOUNTS_RUPEE_MISREAD:
+        return None
+    candidates = _extract_amounts_from_ocr(ocr_text)
+    if not candidates:
+        return None
+    # Prefer amounts that look like real bill totals (e.g. > 10, reasonable max)
+    reasonable = [a for a in candidates if 10 <= a <= 1_000_000]
+    if reasonable:
+        return max(reasonable)
+    return max(candidates) if candidates else None
 
 
 def amount_limit_from_policy(policy: dict | None, category: str) -> float | None:

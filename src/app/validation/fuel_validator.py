@@ -4,6 +4,7 @@ from rapidfuzz import fuzz
 
 from app.validation._common import (
     apply_amount_cap,
+    correct_rupee_misread,
     ensure_bill_id,
     get_validation_params,
     month_match,
@@ -30,6 +31,12 @@ class FuelValidator:
         validations["name_match"] = name_score >= params["name_match_threshold"]
 
         amount = parse_amount(fuel_bill.get("amount"))
+        ocr_text = fuel_bill.get("ocr")
+        corrected = correct_rupee_misread(amount, fuel_bill.get("amount"), ocr_text)
+        if corrected is not None:
+            amount = corrected
+            fuel_bill["amount"] = amount
+            validations["amount_rupee_corrected"] = True
         apply_amount_cap(fuel_bill, amount, params.get("amount_limit_per_bill"))
 
         validations["is_valid"] = validations["month_match"] and validations["name_match"]

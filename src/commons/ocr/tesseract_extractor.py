@@ -1,9 +1,22 @@
 """PDF/image text extraction with native text + Tesseract OCR fallback."""
 
+import re
 import cv2
 import fitz
 import numpy as np
 import pytesseract
+
+
+def normalize_ocr_rupee_symbol(text: str) -> str:
+    """Replace OCR misreads of rupee (₹) as lone 2 or 7 before amount with 'Rs. '.
+    E.g. '2 500' or '7 1,200' -> 'Rs. 500' / 'Rs. 1,200' so downstream parsing sees a clear amount.
+    """
+    if not text or not isinstance(text, str):
+        return text
+    # Lone 2 or 7 (word boundary) followed by space and then digits -> treat as rupee, replace with Rs. 
+    text = re.sub(r"\b2\s+(?=[\d,])", "Rs. ", text)
+    text = re.sub(r"\b7\s+(?=[\d,])", "Rs. ", text)
+    return text
 
 
 def _tesseract_config() -> tuple[int, str]:
@@ -47,4 +60,5 @@ class TesseractPdfExtractor:
             text_ocr = pytesseract.image_to_string(gray, lang=self.ocr_lang)
             full_text += text_ocr + "\n"
 
+        full_text = normalize_ocr_rupee_symbol(full_text)
         return {file_name: full_text}
