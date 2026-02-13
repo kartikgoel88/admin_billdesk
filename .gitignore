@@ -3,3 +3,7 @@ groq
 .idea/
 .venv/
 
+# Model output and processed inputs (from config paths.output_dir, paths.processed_dir)
+resources/model_output/
+resources/processed_inputs/
+

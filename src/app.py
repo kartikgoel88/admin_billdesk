@@ -32,7 +32,7 @@ from langchain_groq import ChatGroq
 
 from commons.constants import Constants as Co
 from commons.FileUtils import FileUtils
-from commons.config_reader import config
+from commons.config import config
 from commons.llm import get_llm_model_name
 
 # Extendible extractors and decision engine
@@ -200,9 +200,13 @@ class BillDeskApp:
         self.employee_org_data = {}  # key: "emp_id_emp_name", value: org API response or None (optional enrichment)
         self.policy = None  # extracted policy JSON (used for validation limits and decision engine)
 
-    def discover_employees(self) -> Dict[str, Dict[str, str]]:
-        """Discover all employee folders in resources"""
-        employees = {}
+    def discover_employees(self) -> Dict[str, Dict[str, List[str]]]:
+        """
+        Discover all employee folders in resources. Supports multiple months per employee:
+        folder names {emp_id}_{emp_name}_{month}_{client} or {emp_id}_{emp_name}_{month}_{year}_{client}.
+        Returns dict: emp_key -> { category -> [folder_path, ...] } (all months collected).
+        """
+        employees: Dict[str, Dict[str, List[str]]] = {}
 
         for category in ["commute", "meal", "fuel"]:
             category_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), self.config.resources_dir, category)
@@ -221,15 +225,15 @@ class BillDeskApp:
                     key = f"{emp_id}_{emp_name}"
 
                     if key not in employees:
-                        employees[key] = {"commute": None, "meal": None, "fuel": None}
-                    employees[key][category] = folder_path
+                        employees[key] = {"commute": [], "meal": [], "fuel": []}
+                    employees[key][category].append(folder_path)
 
         return employees
 
-    def process_employee(self, emp_key: str, folders: Dict[str, str]) -> List[Dict]:
+    def process_employee(self, emp_key: str, folders: Dict[str, List[str]]) -> List[Dict]:
         """
-        Process all invoices for a single employee.
-        Uses extractor registry: add new categories via register_extractor().
+        Process all invoices for a single employee across all month folders.
+        folders: category -> list of folder paths (one per month). Uses extractor registry.
         """
         print(f"\n{'=' * 60}")
         print(f"👤 Processing employee: {emp_key}")
@@ -245,22 +249,23 @@ class BillDeskApp:
         category_labels = {"commute": "🚗 commute", "meal": "🍽️ meal", "fuel": "⛽ fuel"}
 
         for category in ["commute", "meal", "fuel"]:
-            if not folders.get(category) or (self.args.category and self.args.category != category):
+            folder_list = folders.get(category) or []
+            if not folder_list or (self.args.category and self.args.category != category):
                 continue
-            folder_path = folders[category]
-            extractor = get_extractor(
-                category,
-                input_folder=folder_path,
-                system_prompt_path=category_to_prompt.get(category),
-                policy=self.policy,
-            )
-            if not extractor:
-                continue
-            print(f"\n{category_labels.get(category, category)} invoices from: {folder_path}")
-            category_results = extractor.run(save_to_file=True)
-            if category_results:
-                results.extend(category_results)
-                print(f"✅ Extracted {len(category_results)} {category} invoices")
+            for folder_path in folder_list:
+                extractor = get_extractor(
+                    category,
+                    input_folder=folder_path,
+                    system_prompt_path=category_to_prompt.get(category),
+                    policy=self.policy,
+                )
+                if not extractor:
+                    continue
+                print(f"\n{category_labels.get(category, category)} invoices from: {folder_path}")
+                category_results = extractor.run(save_to_file=True)
+                if category_results:
+                    results.extend(category_results)
+                    print(f"✅ Extracted {len(category_results)} {category} invoices")
 
         return results
 

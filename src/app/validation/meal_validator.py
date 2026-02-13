@@ -19,8 +19,7 @@ class MealValidator:
         validations = {}
 
         ensure_bill_id(meal_invoice, params["manual_id_prefix"])
-        # validations["month_match"] = month_match(meal_invoice, params)  # commented out for now
-        validations["month_match"] = True
+        validations["month_match"] = month_match(meal_invoice, params)
 
         rider = (meal_invoice.get("buyer_name") or "").lower()
         emp = (meal_invoice.get("emp_name") or "").lower()

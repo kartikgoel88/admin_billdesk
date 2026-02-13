@@ -13,7 +13,7 @@ DEFAULT_BILL_EXTENSIONS = (".pdf", ".png", ".jpg", ".jpeg")
 
 def _bill_extensions_from_config() -> tuple[str, ...]:
     try:
-        from commons.config_reader import config
+        from commons.config import config
         exts = config.get("folder") or {}
         lst = exts.get("bill_extensions")
         if lst is not None:

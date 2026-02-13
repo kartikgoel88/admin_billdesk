@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
-from commons.config_reader import config
+from commons.config import config
 
 
 def _org_api_config() -> Dict[str, Any]:

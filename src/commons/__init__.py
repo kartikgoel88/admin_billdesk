@@ -8,11 +8,11 @@ Subpackages:
   folder   - FolderNameParser, FolderProcessor; add new naming schemes via new parsers
 
 Backward compatibility:
-  FileUtils, config_reader.config, constants - unchanged API
+  FileUtils, config, load_config (from commons.config), constants - unchanged API
 """
 
 from commons.FileUtils import FileUtils
-from commons.config_reader import config, load_config
+from commons.config import config, load_config
 from commons.constants import Constants
 
 # Extendible modules (use these to plug in new implementations)

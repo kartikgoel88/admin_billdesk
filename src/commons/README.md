@@ -1,6 +1,6 @@
 # Commons (extendible)
 
-Existing callers keep using `FileUtils`, `config_reader.config`, and `Constants` unchanged.
+Existing callers keep using `FileUtils`, `commons.config` (config, load_config), and `Constants` unchanged.
 
 ## Extending
 

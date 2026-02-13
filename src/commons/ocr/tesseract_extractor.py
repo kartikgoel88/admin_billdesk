@@ -8,7 +8,7 @@ import pytesseract
 
 def _tesseract_config() -> tuple[int, str]:
     try:
-        from commons.config_reader import config
+        from commons.config import config
         ocr = config.get("ocr") or {}
         t = ocr.get("tesseract") or {}
         return t.get("dpi", 300), t.get("lang", "eng")

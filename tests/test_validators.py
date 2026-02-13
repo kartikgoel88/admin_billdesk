@@ -203,7 +203,14 @@ class TestRideValidator:
             "pickup_address": "random place",
             "drop_address": "another random",
         }
-        context = {"client_addresses": {"XYZ": ["official office address only"]}}
+        # Use high threshold so "random place" vs "official office address only" fails
+        context = {
+            "client_addresses": {"XYZ": ["official office address only"]},
+            "config": {
+                "validation": {"address_match_threshold": 80},
+                "apps": {"cab": {"validation": {"address_match_threshold": 80}}},
+            },
+        }
         result = v.validate(bill, context)
         assert result["address_match"] is False
         assert result["is_valid"] is False

@@ -19,8 +19,7 @@ class FuelValidator:
         validations = {}
 
         ensure_bill_id(fuel_bill, params["manual_id_prefix"])
-        # validations["month_match"] = month_match(fuel_bill, params, date_key="date")  # commented out for now
-        validations["month_match"] = True
+        validations["month_match"] = month_match(fuel_bill, params, date_key="date")
 
         receipt_name = (
             fuel_bill.get("employee_name") or fuel_bill.get("buyer_name") or ""

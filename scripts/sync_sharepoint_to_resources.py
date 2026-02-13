@@ -10,12 +10,13 @@ Two modes:
      resources/fuel/...
    Zips are detected and unzipped into the same folder (folder name includes category and month).
 
-2) Local mode (--local): reads from local resources (e.g. resources/ashwini/cab/, ...),
+2) Local mode (--local): reads from local resources (e.g. resources/ashwini/cab/, resources/ashwini/cab june/, ...),
    builds the same folder naming, and copies files into paths.processed_dir
    (e.g. resources/processed_inputs/commute/..., meal/..., fuel/...).
+   Supports category subfolders with optional month in name: 'cab', 'cab june', 'meals', 'meals june'
+   (month in name → distinct output folder e.g. 0000_ashwini_jun_unknown so all months are processed).
    Supports employee folder as .zip (e.g. resources/kartik.zip): extracted to temp and walked.
-   Zips are copied then unzipped into the destination (name has meal and month in path).
-   The app can then use --resources-dir resources/processed_inputs to pick from there.
+   Zips are copied then unzipped into the destination. The app can use --resources-dir resources/processed_inputs.
 
 Configuration is read from src/config/config.yaml (sharepoint, paths, folder).
 Env vars override and supply credentials:
@@ -301,14 +302,18 @@ def _local_folder_to_category(folder_name: str) -> Optional[str]:
     return None
 
 
-def _build_standard_name_for_local(emp_name: str, category: str) -> str:
-    """Build {emp_id}_{emp_name}_{month}_{client} for local mode. Default emp_id to 0000 when not in mapping."""
+def _build_standard_name_for_local(
+    emp_name: str,
+    category: str,
+    month: Optional[str] = None,
+) -> str:
+    """Build {emp_id}_{emp_name}_{month}_{client} for local mode. month from folder name (e.g. 'cab june') or default."""
     sp = _sharepoint_settings()
     emp_map = _employee_id_map()
     emp_id = (
         emp_map.get(emp_name) or emp_map.get(emp_name.title()) or ""
     ).strip() or "0000"
-    month = sp.get("default_month") or "unknown"
+    month = (month or sp.get("default_month") or "unknown").strip().lower()
     client = sp.get("default_client") or "unknown"
     name_part = emp_name.replace(" ", "_").lower()
     return f"{emp_id}_{name_part}_{month}_{client}"
@@ -320,20 +325,36 @@ def _local_file_to_category(filename: str) -> Optional[str]:
     return _local_folder_to_category(stem)
 
 
+def _detect_month_from_folder_name(folder_name: str) -> Optional[str]:
+    """Detect month from folder name (e.g. 'cab june' -> 'jun', 'meals june' -> 'jun'). Uses MONTH_MAP."""
+    path_lower = folder_name.lower().strip()
+    for key, std in MONTH_MAP.items():
+        if re.search(rf"\b{re.escape(key)}\b", path_lower):
+            return std
+    return None
+
+
 def _walk_one_employee_dir(
     emp_dir: Path,
     emp_name: str,
     bill_extensions: Tuple[str, ...],
-) -> List[Tuple[str, str, str, List[str]]]:
-    """Collect (emp_name, category, folder_path, file_paths) from one employee dir (or extracted zip)."""
-    results: List[Tuple[str, str, str, List[str]]] = []
-    # 1) Subfolders named by category (cab, meals, etc.) with bill/archive files inside
+) -> List[Tuple[str, str, str, List[str], Optional[str]]]:
+    """
+    Collect (emp_name, category, folder_path, file_paths, month_override) from one employee dir.
+    Supports subfolders like 'cab', 'cab june', 'meals', 'meals june' (month in name -> distinct output folder).
+    """
+    results: List[Tuple[str, str, str, List[str], Optional[str]]] = []
+    sp = _sharepoint_settings()
+    default_month = sp.get("default_month") or "unknown"
+
+    # 1) Subfolders named by category (cab, cab june, meals, meals june, etc.) with bill/archive files inside
     for sub in emp_dir.iterdir():
         if not sub.is_dir():
             continue
         category = _local_folder_to_category(sub.name)
         if not category:
             continue
+        month_override = _detect_month_from_folder_name(sub.name) or default_month
         files = [
             str(p) for p in sub.iterdir()
             if p.is_file() and (
@@ -342,7 +363,7 @@ def _walk_one_employee_dir(
             )
         ]
         if files:
-            results.append((emp_name, category, str(sub), files))
+            results.append((emp_name, category, str(sub), files, month_override))
     # 2) Category-named files directly in employee folder (e.g. kartik/cab.zip)
     for f in emp_dir.iterdir():
         if not f.is_file() or f.name.startswith("."):
@@ -355,22 +376,25 @@ def _walk_one_employee_dir(
         category = _local_file_to_category(f.name)
         if not category:
             continue
-        results.append((emp_name, category, str(emp_dir), [str(f)]))
+        # Stem can be "cab june" etc.; detect month from filename if present
+        month_override = _detect_month_from_folder_name(Path(f.name).stem) or default_month
+        results.append((emp_name, category, str(emp_dir), [str(f)], month_override))
     return results
 
 
 def walk_local_folders(
     resources_root: str,
     bill_extensions: Tuple[str, ...],
-) -> List[Tuple[str, str, str, List[str]]]:
+) -> List[Tuple[str, str, str, List[str], Optional[str]]]:
     """
-    Walk resources_root (e.g. resources/). Returns (emp_name, category, folder_path, [file paths]).
+    Walk resources_root (e.g. resources/). Returns (emp_name, category, folder_path, [file paths], month_override).
     Supports:
-      - resources/{emp_name}/{category_folder}/files   (e.g. smitha/cab/*.pdf, smitha/meals/*.pdf)
-      - resources/{emp_name}/{category_file}          (e.g. kartik/cab.zip at employee level)
-      - resources/{emp_name}.zip                      (employee folder as zip; extracted to temp and walked)
+      - resources/{emp_name}/{category_folder}/files   (e.g. ashwini/cab/*.pdf, ashwini/cab june/*.pdf, meals, meals june)
+      - resources/{emp_name}/{category_file}           (e.g. kartik/cab.zip at employee level)
+      - resources/{emp_name}.zip                       (employee folder as zip; extracted to temp and walked)
+    Month in folder name (e.g. 'cab june', 'meals june') produces a distinct output folder per month.
     """
-    results: List[Tuple[str, str, str, List[str]]] = []
+    results: List[Tuple[str, str, str, List[str], Optional[str]]] = []
     resources_path = Path(resources_root)
     if not resources_path.is_dir():
         return results
@@ -426,8 +450,8 @@ def main_local() -> None:
         print("No bill folders found under resources (expected: resources/<emp_name>/<cab|meals|...>/files).")
         return
 
-    for emp_name, category, folder_path, file_paths in entries:
-        std_name = _build_standard_name_for_local(emp_name, category)
+    for emp_name, category, folder_path, file_paths, month_override in entries:
+        std_name = _build_standard_name_for_local(emp_name, category, month=month_override)
         print(f"\n{folder_path}")
         print(f"  → {std_name}")
         copy_local_to_processed(processed_dir, category, std_name, file_paths)

@@ -2,7 +2,7 @@
 
 import json
 
-from commons.config_reader import config
+from commons.config import config
 from entity.ride_extraction_schema import RideExtractionList
 
 from app.extractors._paths import project_path

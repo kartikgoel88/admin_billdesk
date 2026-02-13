@@ -16,7 +16,7 @@ def test_standard_parser_valid_folder(tmp_path):
     emp = parser.parse(str(folder))
     assert emp.emp_id == "IIIPL-1234"
     assert emp.emp_name == "John"
-    assert emp.emp_month == "Jan"
+    assert emp.emp_month == "jan"  # normalized for validation
     assert emp.client == "ClientA"
 
 
@@ -27,7 +27,7 @@ def test_standard_parser_relative_path_resolved(tmp_path):
     emp = parser.parse(str(folder))
     assert emp.emp_id == "E001"
     assert emp.emp_name == "Jane"
-    assert emp.emp_month == "Dec"
+    assert emp.emp_month == "dec"  # normalized for validation
     assert emp.client == "Acme"
 
 
@@ -54,8 +54,32 @@ def test_standard_parser_custom_separator(tmp_path):
     emp = parser.parse(str(folder))
     assert emp.emp_id == "E1"
     assert emp.emp_name == "Joe"
-    assert emp.emp_month == "Mar"
+    assert emp.emp_month == "mar"  # normalized for validation
     assert emp.client == "XYZ"
+
+
+def test_standard_parser_five_parts_month_year(tmp_path):
+    """Folder name: emp_id_emp_name_month_year_client (e.g. 10_2025)."""
+    folder = tmp_path / "E002_Bob_10_2025_Acme"
+    folder.mkdir()
+    parser = StandardFolderNameParser(separator="_", min_parts=4)
+    emp = parser.parse(str(folder))
+    assert emp.emp_id == "E002"
+    assert emp.emp_name == "Bob"
+    assert emp.emp_month == "oct"
+    assert emp.client == "Acme"
+
+
+def test_standard_parser_numeric_month(tmp_path):
+    """Month as number (e.g. 10) is normalized to name (oct)."""
+    folder = tmp_path / "E003_Carol_10_ClientC"
+    folder.mkdir()
+    parser = StandardFolderNameParser(separator="_", min_parts=4)
+    emp = parser.parse(str(folder))
+    assert emp.emp_id == "E003"
+    assert emp.emp_name == "Carol"
+    assert emp.emp_month == "oct"
+    assert emp.client == "ClientC"
 
 
 def test_employee_to_dict():

@@ -6,7 +6,7 @@ Add new providers by adding a _build_<name> function and registering in _BUILDER
 import os
 from typing import Any
 
-from commons.config_reader import config
+from commons.config import config
 from commons.constants import Constants as Co
 
 

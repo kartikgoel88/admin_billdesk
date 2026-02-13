@@ -15,7 +15,7 @@ def project_path(*parts: str) -> str:
 def _output_base_from_config() -> str:
     """Base output dir from config (e.g. resources/model_output)."""
     try:
-        from commons.config_reader import config
+        from commons.config import config
         paths = config.get("paths") or {}
         base = paths.get("output_dir")
         if base:

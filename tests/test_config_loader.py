@@ -10,7 +10,9 @@ from commons.config.loader import ConfigProvider, YamlConfigProvider, get_config
 
 
 def test_yaml_config_provider_loads_file():
-    with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+    with tempfile.NamedTemporaryFile(
+        suffix=".yaml", delete=False, mode="w", encoding="utf-8"
+    ) as f:
         yaml.dump({"foo": "bar", "nested": {"a": 1}}, f)
         path = Path(f.name)
     try:
@@ -32,7 +34,9 @@ def test_yaml_config_provider_default_path_exists():
 
 
 def test_get_config_uses_provider():
-    with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+    with tempfile.NamedTemporaryFile(
+        suffix=".yaml", delete=False, mode="w", encoding="utf-8"
+    ) as f:
         yaml.dump({"custom": True}, f)
         path = Path(f.name)
     try:

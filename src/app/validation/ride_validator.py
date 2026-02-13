@@ -21,8 +21,7 @@ class RideValidator:
         validations = {}
 
         ensure_bill_id(ride, params["manual_id_prefix"])
-        # validations["month_match"] = month_match(ride, params)  # commented out for now
-        validations["month_match"] = True
+        validations["month_match"] = month_match(ride, params)
 
         rider = (ride.get("rider_name") or "").lower()
         emp = (ride.get("emp_name") or "").lower()
@@ -43,10 +42,9 @@ class RideValidator:
                 fuzz.partial_ratio(drop, addr_lower),
             )
         validations["address_match_score"] = best_address_score
-        # validations["address_match"] = (
-        #     best_address_score >= params["address_match_threshold"]
-        # )  # commented out for now
-        validations["address_match"] = True
+        validations["address_match"] = (
+            best_address_score >= params["address_match_threshold"]
+        )
 
         validations["is_valid"] = (
             validations["month_match"]
