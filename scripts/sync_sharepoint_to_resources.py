@@ -4,7 +4,7 @@ sync_sharepoint_to_resources.py
 Two modes:
 
 1) SharePoint mode (default): reads folder tree from SharePoint, normalizes folder names
-   into {emp_id}_{emp_name}_{month}_{client}, and downloads bills into:
+   into {emp_id}_{emp_name}_{month}_{client} (emp_id defaults to 0000 when not found), and downloads bills into:
      resources/commute/...
      resources/meal/...
      resources/fuel/...
@@ -41,6 +41,13 @@ import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+# Load .env so SHAREPOINT_*, etc. are available (no dependency on commons)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
 
 # SharePoint mode only
 try:
@@ -241,7 +248,7 @@ def build_standard_folder_name(sp_folder_url: str, category: str) -> Optional[st
     if not emp_name or not month:
         return None
     if not emp_id:
-        emp_id = emp_name.upper()
+        emp_id = "0000"
     return f"{emp_id}_{emp_name}_{month}_{client}"
 
 
@@ -295,12 +302,12 @@ def _local_folder_to_category(folder_name: str) -> Optional[str]:
 
 
 def _build_standard_name_for_local(emp_name: str, category: str) -> str:
-    """Build {emp_id}_{emp_name}_{month}_{client} for local mode (defaults for missing parts)."""
+    """Build {emp_id}_{emp_name}_{month}_{client} for local mode. Default emp_id to 0000 when not in mapping."""
     sp = _sharepoint_settings()
     emp_map = _employee_id_map()
     emp_id = (
         emp_map.get(emp_name) or emp_map.get(emp_name.title()) or ""
-    ).strip() or emp_name.upper().replace(" ", "_")
+    ).strip() or "0000"
     month = sp.get("default_month") or "unknown"
     client = sp.get("default_client") or "unknown"
     name_part = emp_name.replace(" ", "_").lower()

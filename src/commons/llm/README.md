@@ -4,19 +4,21 @@ Switch providers by changing `llm.provider` in `config/config.yaml`. No code cha
 
 ## Supported providers
 
-| provider   | config key  | env vars / notes |
-|-----------|-------------|-------------------|
-| groq       | `groq`      | `GROQ_API_KEY` |
-| openai     | `openai`    | `OPENAI_API_KEY` |
-| anthropic  | `anthropic` | `ANTHROPIC_API_KEY` |
-| azure      | `azure`     | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` (optional `api_version` in config) |
+| provider    | config key     | env vars / notes |
+|-------------|----------------|-------------------|
+| ollama      | `ollama`       | No key; optional `base_url` in config |
+| groq        | `groq`         | `GROQ_API_KEY` |
+| openai      | `openai`       | `OPENAI_API_KEY` |
+| anthropic   | `anthropic`   | `ANTHROPIC_API_KEY` |
+| azure       | `azure`       | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` (optional `api_version` in config) |
+| huggingface | `huggingface` | `HUGGINGFACEHUB_API_TOKEN`; `model` = Hub repo_id (e.g. `meta-llama/Llama-3.2-3B-Instruct`) |
 
 ## Changing the provider
 
 1. In `src/config/config.yaml`, set:
    ```yaml
    llm:
-     provider: openai   # or groq, anthropic, azure
+     provider: openai   # or ollama, groq, anthropic, azure, huggingface
      temperature: 0
      providers:
        openai:

@@ -15,11 +15,36 @@ from langchain_core.prompts import ChatPromptTemplate
 from commons.FileUtils import FileUtils
 from commons.llm import get_llm
 
+from app.extractors.base_extractor import _extract_json_from_llm_output
+
 # Resolve project root from app/decision/engine.py -> app -> src -> project
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 _DATE_FMT = "%d/%m/%Y"
 _MONTH_FMT = "%Y-%m"
+
+
+def _validation_to_reason(validation: Dict) -> str:
+    """Build a short reason string from validation flags (for invalid bills)."""
+    if not validation:
+        return "Validation failed"
+    v = validation
+    reasons = []
+    if not v.get("month_match", True):
+        reasons.append("Month mismatch")
+    if not v.get("name_match", True):
+        score = v.get("name_match_score")
+        if score is not None:
+            reasons.append(f"Name mismatch ({int(score)}%)")
+        else:
+            reasons.append("Name mismatch")
+    if "address_match" in v and not v.get("address_match", True):
+        score = v.get("address_match_score")
+        if score is not None:
+            reasons.append(f"Address mismatch ({int(score)}%)")
+        else:
+            reasons.append("Address mismatch")
+    return "; ".join(reasons) if reasons else "Validation failed"
 
 
 def _month_from_bills(bills: List[Dict], date_key: str = "date") -> str:
@@ -103,6 +128,7 @@ class DecisionEngine:
                 if category == "meal" and daily_totals:
                     for date, total in daily_totals.items():
                         date_bills = [b for b in valid_bills if b.get("date") == date]
+                        inv_for_date = [b for b in invalid_bills if b.get("date") == date]
                         try:
                             month = datetime.strptime(date, _DATE_FMT).strftime(_MONTH_FMT)
                         except (ValueError, TypeError):
@@ -114,7 +140,11 @@ class DecisionEngine:
                             "date": date,
                             "month": month,
                             "valid_bills": [b.get("id") for b in valid_bills if b.get("date") == date],
-                            "invalid_bills": [b.get("id") for b in invalid_bills if b.get("date") == date],
+                            "invalid_bills": [b.get("id") for b in inv_for_date],
+                            "invalid_bill_reasons": [
+                                {"bill_id": b.get("id"), "reason": _validation_to_reason(b.get("validation") or {})}
+                                for b in inv_for_date
+                            ],
                             "daily_total": total,
                             "monthly_total": None,
                             "currency": _currency_from_bills(date_bills) or group_currency,
@@ -129,6 +159,10 @@ class DecisionEngine:
                         "month": month,
                         "valid_bills": [b.get("id") for b in valid_bills],
                         "invalid_bills": [b.get("id") for b in invalid_bills],
+                        "invalid_bill_reasons": [
+                            {"bill_id": b.get("id"), "reason": _validation_to_reason(b.get("validation") or {})}
+                            for b in invalid_bills
+                        ],
                         "daily_total": None,
                         "monthly_total": sum(
                             float(b.get("reimbursable_amount") or b.get("amount") or 0) for b in valid_bills
@@ -203,7 +237,12 @@ class DecisionEngine:
         self._copy_files(save_data)
 
         try:
-            decisions = json.loads(output)
+            # Robust parse: handle markdown, Python literals, missing quotes, etc.
+            json_str = _extract_json_from_llm_output(output)
+            if json_str is None:
+                print("⚠️ Could not parse decision output as JSON")
+                return []
+            decisions = json.loads(json_str)
             if not isinstance(decisions, list):
                 return []
             # Align with groups_data (same order); set approved_amount, claimed_amount, currency; fix REJECT consistency
@@ -235,8 +274,28 @@ class DecisionEngine:
                         item["approved_amount"] = 0
                 # Month from bills (set in _prepare_groups)
                 item["month"] = group.get("month", "unknown")
+                # Per-invalid-bill reasons: validation first, then LLM-provided, then fallback
+                reason_lookup = {r["bill_id"]: r["reason"] for r in (group.get("invalid_bill_reasons") or [])}
+                for r in (item.get("invalid_bill_reasons") or []):
+                    bid = r.get("bill_id")
+                    if bid and r.get("reason"):
+                        reason_lookup[bid] = (r.get("reason") or "").strip() or reason_lookup.get(bid)
+                invalid_bill_reasons = []
+                for bid in (item.get("invalid_bill_ids") or []):
+                    reason = reason_lookup.get(bid) or "Rejected (no specific reason provided)"
+                    invalid_bill_reasons.append({"bill_id": bid, "reason": reason})
+                item["invalid_bill_reasons"] = invalid_bill_reasons
+                # Group same reasons for error_summary
+                by_reason: Dict[str, Dict[str, Any]] = {}
+                for r in invalid_bill_reasons:
+                    reason = r["reason"]
+                    if reason not in by_reason:
+                        by_reason[reason] = {"reason": reason, "bill_ids": [], "count": 0}
+                    by_reason[reason]["bill_ids"].append(r["bill_id"])
+                    by_reason[reason]["count"] += 1
+                item["error_summary"] = list(by_reason.values())
             return decisions
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, TypeError, ValueError):
             print("⚠️ Could not parse decision output as JSON")
             return []
 

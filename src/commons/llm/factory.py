@@ -10,10 +10,16 @@ from commons.config_reader import config
 from commons.constants import Constants as Co
 
 
+def get_llm_provider() -> str:
+    """Return the configured LLM provider key (e.g. 'openai', 'ollama')."""
+    llm_cfg = config.get(Co.LLM) or {}
+    return (llm_cfg.get(Co.PROVIDER) or "groq").strip().lower()
+
+
 def get_llm_model_name() -> str:
     """Return the configured model name (for output paths, etc.)."""
     llm_cfg = config.get(Co.LLM) or {}
-    provider = (llm_cfg.get(Co.PROVIDER) or "groq").strip().lower()
+    provider = get_llm_provider()
     providers_cfg = llm_cfg.get(Co.PROVIDERS) or {}
     provider_cfg = providers_cfg.get(provider) or {}
     return (
@@ -65,9 +71,13 @@ def get_llm(
         )
     if provider != "ollama" and not (api_key and api_key.strip()):
         raise ValueError(
-            f"LLM provider {provider!r} requires an API key. Set {api_key_env_name!r} env var or "
-            f"llm.providers.{provider}.api_key in config.yaml (or put the key in api_key_env in config)."
+            f"LLM provider {provider!r} requires an API key. Set {api_key_env_name!r} in .env (see .env.example) or "
+            f"llm.providers.{provider}.api_key in config.yaml."
         )
+    # Pass http_client via provider_cfg so builders can pass it explicitly to the model (avoids LangChain warning)
+    http_client = kwargs.pop("http_client", None)
+    if http_client is not None:
+        provider_cfg = {**provider_cfg, "http_client": http_client}
     return builder(
         model=model,
         temperature=temperature,
@@ -84,7 +94,15 @@ def _build_groq(model: str, temperature: float, api_key: str, provider_cfg: dict
 
 def _build_openai(model: str, temperature: float, api_key: str, provider_cfg: dict | None = None, **kwargs) -> Any:
     from langchain_openai import ChatOpenAI
-    return ChatOpenAI(model=model, temperature=temperature, api_key=api_key, **kwargs)
+    provider_cfg = dict(provider_cfg or {})
+    http_client = provider_cfg.pop("http_client", None)
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        api_key=api_key,
+        http_client=http_client,
+        **kwargs,
+    )
 
 
 def _build_anthropic(model: str, temperature: float, api_key: str, provider_cfg: dict | None = None, **kwargs) -> Any:
@@ -95,7 +113,8 @@ def _build_anthropic(model: str, temperature: float, api_key: str, provider_cfg:
 def _build_azure(model: str, temperature: float, api_key: str, provider_cfg: dict | None = None, **kwargs) -> Any:
     """Azure OpenAI: set api_base_env (e.g. AZURE_OPENAI_ENDPOINT) and optionally api_version in config."""
     from langchain_openai import AzureChatOpenAI
-    provider_cfg = provider_cfg or {}
+    provider_cfg = dict(provider_cfg or {})
+    http_client = provider_cfg.pop("http_client", None)
     base_env = provider_cfg.get(Co.API_BASE_ENV) or "AZURE_OPENAI_ENDPOINT"
     api_version = provider_cfg.get(Co.API_VERSION) or "2024-02-15-preview"
     azure_endpoint = os.getenv(base_env) or ""
@@ -105,6 +124,7 @@ def _build_azure(model: str, temperature: float, api_key: str, provider_cfg: dic
         api_key=api_key,
         azure_endpoint=azure_endpoint,
         api_version=api_version,
+        http_client=http_client,
         **kwargs,
     )
 
@@ -122,10 +142,30 @@ def _build_ollama(model: str, temperature: float, api_key: str, provider_cfg: di
     )
 
 
+def _build_huggingface(model: str, temperature: float, api_key: str, provider_cfg: dict | None = None, **kwargs) -> Any:
+    """Hugging Face Inference API. Set llm.providers.huggingface.model to a Hub repo_id (e.g. meta-llama/Llama-3.2-3B-Instruct)."""
+    from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+    provider_cfg = provider_cfg or {}
+    max_new_tokens = provider_cfg.get("max_new_tokens", 1024)
+    do_sample = temperature > 0
+    endpoint_kwargs = {
+        "repo_id": model,
+        "task": "text-generation",
+        "max_new_tokens": max_new_tokens,
+        "do_sample": do_sample,
+        "huggingfacehub_api_token": api_key.strip() or None,
+    }
+    if do_sample:
+        endpoint_kwargs["temperature"] = temperature
+    llm = HuggingFaceEndpoint(**endpoint_kwargs, **kwargs)
+    return ChatHuggingFace(llm=llm)
+
+
 _BUILDERS: dict[str, Any] = {
     "ollama": _build_ollama,
     "groq": _build_groq,
     "openai": _build_openai,
     "anthropic": _build_anthropic,
     "azure": _build_azure,
+    "huggingface": _build_huggingface,
 }

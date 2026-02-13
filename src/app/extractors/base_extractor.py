@@ -28,12 +28,27 @@ def _extract_json_from_llm_output(text: str) -> str | None:
             s = match.group(1).strip()
     # Try direct parse first
     try:
-        json.loads(s)
+        data = json.loads(s)
+        # If result is a string (model wrapped output in quotes), try parsing as Python literal
+        if isinstance(data, str) and data.strip().startswith(("[", "{")):
+            try:
+                parsed = ast.literal_eval(data)
+                if isinstance(parsed, (list, dict)):
+                    return json.dumps(parsed)
+            except (ValueError, SyntaxError, TypeError):
+                pass
         return s
     except (json.JSONDecodeError, TypeError):
         pass
-    # Fix common LLM mistakes: single-quoted keys/strings (Python-style) -> double quotes for JSON
-    # Only replace ' with " when it looks like a key or simple string boundary (greedy match from start of key)
+    # Fix common LLM mistakes: key missing opening quote (e.g. {filename": -> {"filename":)
+    try:
+        fixed = re.sub(r'(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)"\s*:', r'\1"\2":', s)
+        if fixed != s:
+            json.loads(fixed)
+            return fixed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    # Single-quoted keys (Python-style) -> double quotes for JSON
     try:
         fixed = re.sub(r"'([^']*)'\s*:", r'"\1":', s)
         if fixed != s:
@@ -41,6 +56,14 @@ def _extract_json_from_llm_output(text: str) -> str | None:
             return fixed
     except (json.JSONDecodeError, TypeError):
         pass
+    # Python literal (single-quoted keys and values, e.g. [{'filename': 'x'}, ...])
+    if s.startswith("[") or s.startswith("{"):
+        try:
+            parsed = ast.literal_eval(s)
+            if isinstance(parsed, (list, dict)):
+                return json.dumps(parsed)
+        except (ValueError, SyntaxError, TypeError):
+            pass
     # Try to find a JSON array first (expected for meal/cab), then a single object
     for pattern in (r"\[[\s\S]*\]", r"\{[\s\S]*\}"):
         match = re.search(pattern, s)
@@ -50,19 +73,28 @@ def _extract_json_from_llm_output(text: str) -> str | None:
                 json.loads(candidate)
                 return candidate
             except (json.JSONDecodeError, TypeError):
-                try:
-                    fixed = re.sub(r"'([^']*)'\s*:", r'"\1":', candidate)
+                pass
+            # Apply same fixes to the extracted candidate
+            try:
+                fixed = re.sub(r'(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)"\s*:', r'\1"\2":', candidate)
+                if fixed != candidate:
                     json.loads(fixed)
                     return fixed
-                except (json.JSONDecodeError, TypeError):
-                    pass
-                # Last resort: Python literal (single quotes, True/False, etc.)
-                try:
-                    parsed = ast.literal_eval(candidate)
-                    if isinstance(parsed, (list, dict)):
-                        return json.dumps(parsed)
-                except (ValueError, SyntaxError, TypeError):
-                    continue
+            except (json.JSONDecodeError, TypeError):
+                pass
+            try:
+                fixed = re.sub(r"'([^']*)'\s*:", r'"\1":', candidate)
+                json.loads(fixed)
+                return fixed
+            except (json.JSONDecodeError, TypeError):
+                pass
+            # Last resort: Python literal (single quotes, True/False, etc.)
+            try:
+                parsed = ast.literal_eval(candidate)
+                if isinstance(parsed, (list, dict)):
+                    return json.dumps(parsed)
+            except (ValueError, SyntaxError, TypeError):
+                continue
     return None
 
 
@@ -143,7 +175,10 @@ class BaseInvoiceExtractor:
                 "Here are the receipts:\n{receipts_json}\n\nOutput must follow this JSON schema:\n{format_instructions}",
             ),
         ])
+        # OpenAI/Groq function-calling and native response_format both require top-level type "object".
+        # Our schemas are RootModel[list[...]] (array), so we always use prompt + parser (no with_structured_output).
         self.chain = self.prompt | self.llm | self.parser
+        self._use_structured_output = False
         self._extra_init()
 
     def _extra_init(self) -> None:
@@ -182,12 +217,15 @@ class BaseInvoiceExtractor:
                 "receipts_json": self.receipts,
                 "format_instructions": self.parser.get_format_instructions(),
             })
-            output_data = result.root
+            # Parser path returns RootModel; structured-output path may return RootModel or list
+            output_data = result.root if hasattr(result, "root") else result
+            if not isinstance(output_data, list):
+                output_data = list(output_data) if output_data else []
             print("\n✔ Batch Extracted Successfully")
 
             validated_results = []
             for item in output_data:
-                base = item.model_dump()
+                base = item.model_dump() if hasattr(item, "model_dump") else item
                 enriched = self._enrich(base)
                 enriched["validation"] = self._validate(enriched)
                 validated_results.append(enriched)

@@ -1,9 +1,10 @@
 """You are an expert cab invoice parser. You will receive a JSON array of objects.
-Each object has a python dictionary as follows
-- file_name : ocr_text
+Each object has file_name : ocr_text (filename to OCR text).
+
+CRITICAL: Your entire response must be ONLY a valid JSON array. Do NOT write any code (no Python, no JavaScript). Do NOT explain or describe. Do NOT output markdown, backticks, or text before/after the array. Your first character must be [ and your last character must be ]. Output the extracted ride data directly as JSON, not code that would extract it.
 
 Task:
-Extract the following fields for each receipt and return a single VALID JSON ARRAY of objects (no prose, no markdown, nothing else):
+Extract the following fields for each receipt and return a single JSON array of objects:
 
 Fields per object (exact keys and types):
 - filename:  return as passed in the dictionary
@@ -37,6 +38,6 @@ Make sure you strictly follow these rules and do not infer anything else:
    - Only extract distance if OCR contains an explicit numeric value + a unit
      like 'km', 'KM', 'kilometers', 'mi', 'miles'.
    - Do not calculate distance by the fare per km and total fare, this is a strict rule
-9. Id is the bill id or the id number available in the text for the particular cab journey
-10. Do NOT output anything except the JSON array. No markdown or commentary.
+9. Id is the bill id or the id number available in the text for the particular cab journey.
+10. Response = only the JSON array, nothing else. No code, no commentary.
 """

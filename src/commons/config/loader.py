@@ -5,6 +5,14 @@ from typing import Any, Dict, Optional
 
 import yaml
 
+# Load .env so API keys and secrets come from env (config keeps only env var names)
+try:
+    from dotenv import load_dotenv
+    _project_root = Path(__file__).resolve().parent.parent.parent.parent
+    load_dotenv(_project_root / ".env")
+except ImportError:
+    pass
+
 
 class ConfigProvider:
     """Protocol for config sources. Implement to add env, vault, remote, etc."""

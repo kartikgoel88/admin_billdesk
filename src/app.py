@@ -14,10 +14,12 @@ Usage:
 """
 
 import os
+import re
 import sys
 import json
 import argparse
 import shutil
+from datetime import datetime
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 
@@ -54,7 +56,7 @@ def _default_resources_dir() -> str:
 class AppConfig:
     """Application configuration loaded from config.yaml"""
     resources_dir: str = field(default_factory=_default_resources_dir)
-    output_dir: str = field(default_factory=lambda: (config.get("paths") or {}).get("output_dir", "src/model_output"))
+    output_dir: str = field(default_factory=lambda: (config.get("paths") or {}).get("output_dir", "resources/model_output"))
     model_name: str = field(default_factory=get_llm_model_name)
     temperature: float = field(default_factory=lambda: (config.get(Co.LLM) or {}).get(Co.TEMPERATURE, 0))
     enable_rag: bool = field(default_factory=lambda: config.get("rag", {}).get("enabled", False))
@@ -362,12 +364,28 @@ class BillDeskApp:
                     cat = d.get("category", "unknown")
                     month = d.get("month", "unknown")
                     grouped.setdefault(name, {}).setdefault(cat, {}).setdefault(month, []).append(d)
+
+                # --- Audit file (tech): full detail for traceability ---
+                _audit = {
+                    "_meta": {
+                        "purpose": "Audit trail: full decision detail for traceability and debugging",
+                        "model": self.config.model_name,
+                        "generated_at": datetime.now().isoformat(),
+                    },
+                    "decisions": grouped,
+                }
                 decisions_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions.json"
                 with open(decisions_path, "w", encoding="utf-8") as f:
-                    json.dump(grouped, f, indent=2)
-                print(f"\n💾 Decisions saved to: {decisions_path} (grouped by name → category → month)")
+                    json.dump(_audit, f, indent=2)
+                print(f"\n💾 Decisions (audit) saved to: {decisions_path} (full detail for tech/audit)")
 
-                # Summary by employee → category → month (summed amounts for admin validation)
+                # --- Admin summary: high-level only, no bill IDs ---
+                def _normalize_reason(reason: str) -> str:
+                    """Strip (42%) etc. so 'Name mismatch (50%)' and 'Name mismatch (28%)' group as 'Name mismatch'."""
+                    if not reason:
+                        return "Other"
+                    return re.sub(r"\s*\(\d+%\)\s*$", "", str(reason).strip()) or "Other"
+
                 summary = {}
                 for name, by_cat in grouped.items():
                     summary[name] = {}
@@ -378,17 +396,37 @@ class BillDeskApp:
                             total_approved = sum(float(d.get("approved_amount") or 0) for d in items)
                             any_reject = any((d.get("decision") or "").upper() == "REJECT" for d in items)
                             currency = (items[0].get("currency") or "INR") if items else "INR"
-                            summary[name][cat][month] = {
+                            valid_count = sum(len(d.get("valid_bill_ids") or []) for d in items)
+                            invalid_count = sum(len(d.get("invalid_bill_ids") or []) for d in items)
+                            # Group invalid reasons by normalized label (no bill_ids for admin)
+                            reason_counts = {}
+                            for d in items:
+                                for es in (d.get("error_summary") or []):
+                                    r = _normalize_reason(es.get("reason", ""))
+                                    reason_counts[r] = reason_counts.get(r, 0) + (es.get("count") or len(es.get("bill_ids") or []))
+                            invalid_reasons = [{"reason": r, "count": c} for r, c in sorted(reason_counts.items())] if reason_counts else []
+                            entry = {
                                 "decision": "REJECT" if any_reject else "APPROVE",
                                 "claimed_amount": round(total_claimed, 2),
                                 "approved_amount": round(total_approved, 2),
                                 "currency": currency,
-                                "decision_count": len(items),
+                                "valid_bill_count": valid_count,
+                                "invalid_bill_count": invalid_count,
+                                "period_count": len(items),
                             }
+                            if invalid_reasons:
+                                entry["invalid_reasons"] = invalid_reasons
+                            summary[name][cat][month] = entry
                 summary_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/decisions_summary.json"
                 with open(summary_path, "w", encoding="utf-8") as f:
                     json.dump(summary, f, indent=2)
-                print(f"💾 Decisions summary saved to: {summary_path} (month-wise sums per employee for admin)")
+                print(f"💾 Admin summary saved to: {summary_path} (high-level for admin team)")
+                # Brief README so teams know which file to use
+                readme_path = os.path.join(decisions_dir, "README.md")
+                with open(readme_path, "w", encoding="utf-8") as f:
+                    f.write("# Decision outputs\n\n")
+                    f.write("- **decisions_summary.json** – For **admin**: high-level view (approve/reject, amounts, valid/invalid counts, reason labels). No bill IDs.\n\n")
+                    f.write("- **decisions.json** – For **tech/audit**: full detail (bill IDs, per-bill reasons, error_summary with IDs) and `_meta` (model, generated_at) for traceability.\n")
             if self.employee_org_data:
                 org_path = f"{self.config.output_dir}/decisions/{self.config.model_name}/employee_org_data.json"
                 with open(org_path, "w", encoding="utf-8") as f:

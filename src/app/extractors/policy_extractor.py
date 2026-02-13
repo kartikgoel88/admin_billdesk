@@ -12,7 +12,7 @@ from commons.config_reader import config
 from commons.constants import Constants as Co
 from commons.llm import get_llm, get_llm_model_name
 
-from app.extractors._paths import project_path
+from app.extractors._paths import get_output_base, project_path
 
 
 class PolicyExtractor:
@@ -51,7 +51,8 @@ class PolicyExtractor:
         print("\n📄 Policy Output:")
         print(output)
 
-        output_path = project_path("src", "model_output", "policy", self.model_name, "policy.json")
+        base_parts = get_output_base().strip("/").split("/")
+        output_path = project_path(*(base_parts + ["policy", self.model_name, "policy.json"]))
         if save_to_file:
             FileUtils.write_json_to_file(output, output_path)
             print(f"✅ Policy JSON written from: {self.input_pdf_path}")
