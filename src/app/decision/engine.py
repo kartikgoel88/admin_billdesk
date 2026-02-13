@@ -282,8 +282,9 @@ class DecisionEngine:
                         item["approved_amount"] = float(item["approved_amount"])
                     except (TypeError, ValueError):
                         item["approved_amount"] = 0
-                # Month from bills (set in _prepare_groups)
+                # Month and bill date from bills (set in _prepare_groups)
                 item["month"] = group.get("month", "unknown")
+                item["date"] = group.get("date")
                 # Per-invalid-bill reasons: validation first, then LLM-provided, then fallback
                 reason_lookup = {r["bill_id"]: r["reason"] for r in (group.get("invalid_bill_reasons") or [])}
                 for r in (item.get("invalid_bill_reasons") or []):

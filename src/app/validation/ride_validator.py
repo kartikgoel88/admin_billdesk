@@ -27,7 +27,10 @@ class RideValidator:
         emp = (ride.get("emp_name") or "").lower()
         name_score = fuzz.partial_ratio(rider, emp)
         validations["name_match_score"] = name_score
-        validations["name_match"] = name_score >= params["name_match_threshold"]
+        if params.get("name_match_required", True):
+            validations["name_match"] = name_score >= params["name_match_threshold"]
+        else:
+            validations["name_match"] = True
 
         pickup = (ride.get("pickup_address") or "").lower()
         drop = (ride.get("drop_address") or "").lower()
@@ -42,9 +45,12 @@ class RideValidator:
                 fuzz.partial_ratio(drop, addr_lower),
             )
         validations["address_match_score"] = best_address_score
-        validations["address_match"] = (
-            best_address_score >= params["address_match_threshold"]
-        )
+        if params.get("address_match_required", True):
+            validations["address_match"] = (
+                best_address_score >= params["address_match_threshold"]
+            )
+        else:
+            validations["address_match"] = True
 
         validations["is_valid"] = (
             validations["month_match"]

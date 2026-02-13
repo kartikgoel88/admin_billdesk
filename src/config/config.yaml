@@ -3,15 +3,23 @@ apps:
     category: cab
     validation:
       name_match_threshold: 75
+      name_match_required: false   # set false to skip name check
       address_match_threshold: 40
+      address_match_required: false # set false to skip address check
+      month_match_required: false # when false, skip month check
   meal:
     category: meal
     validation:
+      name_match_threshold: 75
+      name_match_required: false
+      month_match_required: false
       vendor_match_threshold: 60
   fuel:
     category: fuel
     validation:
       name_match_threshold: 75
+      name_match_required: false
+      month_match_required: false
 
 paths:
   clients_file: clients.json
@@ -31,7 +39,7 @@ sharepoint:
   # Categories synced into paths.resources_dir: commute, meal, fuel (folder names normalized to {emp_id}_{emp_name}_{month}_{client})
   categories:
     commute:
-      keywords: ["cab", "taxi", "commute", "ride", "uber", "ola", "transport"]
+      keywords: ["cab", "taxi", "commute", "ride", "uber", "ola", "transport","travel"]
     meal:
       keywords: ["meal", "meals", "food", "lunch", "dinner"]
     fuel:
@@ -42,9 +50,18 @@ sharepoint:
     amex: "amex"
     "american express": "amex"
 
+# Validation: name mismatch, address mismatch, month mismatch (configurable per app under apps.<app>.validation)
 validation:
+  # Name match: fuzzy score (0-100) above this passes. Bill rider/buyer name vs employee name.
   name_match_threshold: 75
+  # When false, name check is skipped (all bills pass name validation).
+  name_match_required: true
+  # Address match: fuzzy score (0-100) above this passes. Used for cab/commute (pickup/drop vs client addresses).
   address_match_threshold: 40
+  # When false, address check is skipped (cab only).
+  address_match_required: true
+  # Month match: when true, bill date month must match folder emp_month; when false, month check is skipped.
+  month_match_required: true
   manual_id_prefix: "MANUAL"
   date_format: "%d/%m/%Y"
   # Default per-bill cap (overridden by apps.meal/fuel.validation.amount_limit_per_bill). Null = no cap.

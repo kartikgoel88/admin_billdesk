@@ -141,11 +141,28 @@ def get_validation_params(
     app_cfg = apps.get(app_key) or {}
     app_val = app_cfg.get("validation") or {}
 
+    def _bool(val: Any, default: bool) -> bool:
+        if val is None:
+            return default
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            return val.strip().lower() in ("true", "1", "yes")
+        return bool(val)
+
     out = {
         "manual_id_prefix": val.get("manual_id_prefix") or "MANUAL",
         "date_format": val.get("date_format") or "%d/%m/%Y",
         "name_match_threshold": (
             app_val.get("name_match_threshold") or val.get("name_match_threshold") or 75
+        ),
+        "name_match_required": _bool(
+            app_val.get("name_match_required") if "name_match_required" in app_val else val.get("name_match_required"),
+            True,
+        ),
+        "month_match_required": _bool(
+            app_val.get("month_match_required") if "month_match_required" in app_val else val.get("month_match_required"),
+            True,
         ),
     }
     if include_amount_limit:
@@ -163,6 +180,10 @@ def get_validation_params(
             app_val.get("address_match_threshold")
             or val.get("address_match_threshold")
             or 40
+        )
+        out["address_match_required"] = _bool(
+            app_val.get("address_match_required") if "address_match_required" in app_val else val.get("address_match_required"),
+            True,
         )
     return out
 
@@ -189,7 +210,9 @@ def apply_amount_cap(bill: dict, amount: float | None, limit: float | None) -> N
 
 
 def month_match(bill: dict, params: dict, date_key: str = "date") -> bool:
-    """Return True if bill date month matches emp_month from params (date_format, MONTH_MAP)."""
+    """Return True if month check is disabled (month_match_required: false) or bill date month matches emp_month."""
+    if not params.get("month_match_required", True):
+        return True
     try:
         date_val = bill.get(date_key)
         if not date_val:

@@ -28,7 +28,10 @@ class FuelValidator:
         emp = (fuel_bill.get("emp_name") or "").lower()
         name_score = fuzz.partial_ratio(receipt_name, emp)
         validations["name_match_score"] = name_score
-        validations["name_match"] = name_score >= params["name_match_threshold"]
+        if params.get("name_match_required", True):
+            validations["name_match"] = name_score >= params["name_match_threshold"]
+        else:
+            validations["name_match"] = True
 
         amount = parse_amount(fuel_bill.get("amount"))
         ocr_text = fuel_bill.get("ocr")

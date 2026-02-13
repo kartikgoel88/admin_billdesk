@@ -404,25 +404,48 @@ class BillDeskApp:
             json.dump(summary, f, indent=2)
         print(f"💾 Admin summary saved to: {summary_path} (high-level for admin team)")
 
-        # Final CSV: emp id, emp name, category, month, amount approved
+        # Final CSV: emp id, emp name, category, month, amount approved, bill counts, consolidated invalid reasons
+        def _consolidate_invalid_reasons(d: dict) -> str:
+            parts = []
+            for es in d.get("error_summary") or []:
+                reason = (es.get("reason") or "").strip() or "Other"
+                count = es.get("count") or len(es.get("bill_ids") or [])
+                if count > 1:
+                    parts.append(f"{reason} ({count})")
+                else:
+                    parts.append(reason)
+            return "; ".join(parts)
+
         csv_path = os.path.join(base, "decisions", self.config.model_name, "decisions_final.csv")
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["emp_id", "emp_name", "category", "month", "amount_approved"])
+            writer.writerow([
+                "emp_id", "emp_name", "category", "month", "bill_date", "amount_approved",
+                "total_bills", "valid_bills", "invalid_bills", "invalid_reasons",
+            ])
             for d in decisions:
+                valid_ids = d.get("valid_bill_ids") or []
+                invalid_ids = d.get("invalid_bill_ids") or []
+                total = len(valid_ids) + len(invalid_ids)
+                bill_date = d.get("date") or ""
                 writer.writerow([
                     d.get("employee_id", ""),
                     d.get("employee_name", ""),
                     d.get("category", ""),
                     d.get("month", ""),
+                    bill_date,
                     round(float(d.get("approved_amount") or 0), 2),
+                    total,
+                    len(valid_ids),
+                    len(invalid_ids),
+                    _consolidate_invalid_reasons(d),
                 ])
-        print(f"💾 Final CSV saved to: {csv_path} (emp id, emp name, category, month, amount approved)")
+        print(f"💾 Final CSV saved to: {csv_path} (emp, category, month, amount approved, bill counts, invalid reasons)")
 
         readme_path = os.path.join(decisions_dir, "README.md")
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write("# Decision outputs\n\n")
-            f.write("- **decisions_final.csv** – Final flat list: emp_id, emp_name, category, month, amount_approved (one row per employee/category/month).\n\n")
+            f.write("- **decisions_final.csv** – Final flat list: emp_id, emp_name, category, month, bill_date, amount_approved, total_bills, valid_bills, invalid_bills, invalid_reasons (one row per employee/category/month or per day for meal).\n\n")
             f.write("- **decisions_summary.json** – For **admin**: high-level view (approve/reject, amounts, valid/invalid counts, reason labels). No bill IDs.\n\n")
             f.write("- **decisions.json** – For **tech/audit**: full detail (bill IDs, per-bill reasons, error_summary with IDs) and `_meta` (model, generated_at) for traceability.\n")
         if self.employee_org_data:
