@@ -204,6 +204,7 @@ class BillDeskApp:
         """
         Discover all employee folders in resources. Supports multiple months per employee:
         folder names {emp_id}_{emp_name}_{month}_{client} or {emp_id}_{emp_name}_{month}_{year}_{client}.
+        emp_name is normalized (concatenated without spaces) so 'John', 'John Doe', 'John  Doe' match the same employee.
         Returns dict: emp_key -> { category -> [folder_path, ...] } (all months collected).
         """
         employees: Dict[str, Dict[str, List[str]]] = {}
@@ -221,8 +222,9 @@ class BillDeskApp:
                 parts = folder_name.split("_")
                 if len(parts) >= 4:
                     emp_id = parts[0]
-                    emp_name = parts[1]
-                    key = f"{emp_id}_{emp_name}"
+                    emp_name_raw = parts[1]
+                    name_part = re.sub(r"\s+", "", (emp_name_raw or "").strip()).lower()
+                    key = f"{emp_id}_{name_part}"
 
                     if key not in employees:
                         employees[key] = {"commute": [], "meal": [], "fuel": []}

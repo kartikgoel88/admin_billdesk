@@ -14,9 +14,12 @@ Two modes:
    builds the same folder naming, and copies files into paths.processed_dir
    (e.g. resources/processed_inputs/commute/..., meal/..., fuel/...).
    Supports category subfolders with optional month in name: 'cab', 'cab june', 'meals', 'meals june'
-   (month in name → distinct output folder e.g. 0000_ashwini_jun_unknown so all months are processed).
-   Supports employee folder as .zip (e.g. resources/kartik.zip): extracted to temp and walked.
-   Zips are copied then unzipped into the destination. The app can use --resources-dir resources/processed_inputs.
+   (month in name → distinct output folder). Root can also have month folders: resources/june/ashwini/cab/,
+   resources/january/kartik/meals/ (month at root → all employees under that month get that month).
+   Supports employee folder as .zip (e.g. resources/ashwini.zip): extracted to temp and walked.
+   Zip may have category folders at root (cab/, cab june/, meals/) or inside one top-level folder (ashwini/cab/, ashwini/cab june/).
+   Zips are copied then unzipped into the destination.    Duplicate filenames (same employee/month) are written to a separate folder outside processed_inputs
+   (e.g. resources/processed_duplicates) with unique names (e.g. receipt_1.pdf). The app uses only processed_inputs.
 
 Configuration is read from src/config/config.yaml (sharepoint, paths, folder).
 Env vars override and supply credentials:
@@ -96,6 +99,17 @@ def _processed_dir_from_config() -> str:
     return os.path.join(PROJECT_ROOT, out) if not os.path.isabs(out) else out
 
 
+def _duplicates_dir_from_config() -> str:
+    """Duplicates folder outside processed_inputs (e.g. resources/processed_duplicates)."""
+    paths = _config().get("paths") or {}
+    dup = paths.get("duplicates_dir")
+    if dup:
+        return os.path.join(PROJECT_ROOT, dup) if not os.path.isabs(dup) else dup
+    processed = _processed_dir_from_config()
+    parent = os.path.dirname(processed)
+    return os.path.join(parent, "processed_duplicates")
+
+
 def _bill_extensions_from_config() -> Tuple[str, ...]:
     folder_cfg = _config().get("folder") or {}
     exts = folder_cfg.get("bill_extensions") or [".pdf", ".png", ".jpg", ".jpeg"]
@@ -142,19 +156,20 @@ def _employee_id_map() -> Dict[str, str]:
         return json.load(f)
 
 
-# Month name -> standard 3-letter (lowercase)
+# Month name or number -> standard 3-letter (lowercase)
 MONTH_MAP = {
-    "jan": "jan", "january": "jan",
-    "feb": "feb", "february": "feb",
-    "mar": "mar", "march": "mar",
-    "apr": "apr", "april": "apr",
-    "may": "may", "jun": "jun", "june": "jun",
-    "jul": "jul", "july": "jul",
-    "aug": "aug", "august": "aug",
-    "sep": "sep", "sept": "sep", "september": "sep",
-    "oct": "oct", "october": "oct",
-    "nov": "nov", "november": "nov",
-    "dec": "dec", "december": "dec",
+    "jan": "jan", "january": "jan", "1": "jan", "01": "jan",
+    "feb": "feb", "february": "feb", "2": "feb", "02": "feb",
+    "mar": "mar", "march": "mar", "3": "mar", "03": "mar",
+    "apr": "apr", "april": "apr", "4": "apr", "04": "apr",
+    "may": "may", "5": "may", "05": "may",
+    "jun": "jun", "june": "jun", "6": "jun", "06": "jun",
+    "jul": "jul", "july": "jul", "7": "jul", "07": "jul",
+    "aug": "aug", "august": "aug", "8": "aug", "08": "aug",
+    "sep": "sep", "sept": "sep", "september": "sep", "9": "sep", "09": "sep",
+    "oct": "oct", "october": "oct", "10": "oct",
+    "nov": "nov", "november": "nov", "11": "nov",
+    "dec": "dec", "december": "dec", "12": "dec",
 }
 
 # -------------------------------------------------------------------
@@ -225,6 +240,13 @@ def detect_client(path_lower: str) -> str:
     return default_client
 
 
+def normalize_employee_name(name: str) -> str:
+    """Concatenate name parts without spaces, lowercase. Handles 'First', 'Last', 'First Last', 'First  Last' -> same key."""
+    if not name or not isinstance(name, str):
+        return ""
+    return re.sub(r"\s+", "", name.strip()).lower()
+
+
 def extract_employee_from_path(path: str) -> Tuple[str, str]:
     """Extract emp_id and emp_name from folder path (employee = segment under root)."""
     employee_map = _employee_id_map()
@@ -234,14 +256,14 @@ def extract_employee_from_path(path: str) -> Tuple[str, str]:
     employee_folder = parts[-2]
     if re.match(r"(?i)^iiipl-\d+_", employee_folder):
         emp_id, emp_name = employee_folder.split("_", 1)
-        return emp_id, emp_name.lower()
-    emp_name = employee_folder.replace(" ", "_").lower()
+        return emp_id, emp_name
+    emp_name = employee_folder
     emp_id = employee_map.get(employee_folder, "").strip()
     return emp_id, emp_name
 
 
 def build_standard_folder_name(sp_folder_url: str, category: str) -> Optional[str]:
-    """Build {emp_id}_{emp_name}_{month}_{client}. Returns None if we can't infer enough."""
+    """Build {emp_id}_{emp_name}_{month}_{client}. emp_name normalized (no spaces) for consistent matching."""
     path_lower = sp_folder_url.lower()
     emp_id, emp_name = extract_employee_from_path(sp_folder_url)
     month = detect_month(path_lower)
@@ -250,14 +272,25 @@ def build_standard_folder_name(sp_folder_url: str, category: str) -> Optional[st
         return None
     if not emp_id:
         emp_id = "0000"
-    return f"{emp_id}_{emp_name}_{month}_{client}"
+    name_part = normalize_employee_name(emp_name)
+    return f"{emp_id}_{name_part}_{month}_{client}"
 
 
-def download_file(ctx: "ClientContext", sp_file, dest_folder: str) -> str:
-    """Download file to dest_folder. Returns path to the downloaded file."""
+def download_file(
+    ctx: "ClientContext",
+    sp_file,
+    dest_folder: str,
+    duplicate_folder: Optional[str] = None,
+) -> str:
+    """Download file to dest_folder. If name exists, place in duplicate_folder (outside main output) with unique name."""
     os.makedirs(dest_folder, exist_ok=True)
-    local_path = os.path.join(dest_folder, sp_file.name)
-    print(f"  → {sp_file.name}")
+    name = sp_file.name
+    dup_dir = duplicate_folder or os.path.join(dest_folder, "duplicate")
+    local_path, is_duplicate = _unique_dest_path(dest_folder, dup_dir, name)
+    if is_duplicate:
+        print(f"  → [duplicates] {os.path.basename(local_path)}  (duplicate of {name})")
+    else:
+        print(f"  → {name}")
     with open(local_path, "wb") as f:
         sp_file.download(f).execute_query()
     return local_path
@@ -307,15 +340,15 @@ def _build_standard_name_for_local(
     category: str,
     month: Optional[str] = None,
 ) -> str:
-    """Build {emp_id}_{emp_name}_{month}_{client} for local mode. month from folder name (e.g. 'cab june') or default."""
+    """Build {emp_id}_{emp_name}_{month}_{client} for local mode. emp_name concatenated without spaces for consistent matching."""
     sp = _sharepoint_settings()
     emp_map = _employee_id_map()
     emp_id = (
-        emp_map.get(emp_name) or emp_map.get(emp_name.title()) or ""
+        emp_map.get(emp_name) or emp_map.get(emp_name.title()) or emp_map.get(normalize_employee_name(emp_name)) or ""
     ).strip() or "0000"
     month = (month or sp.get("default_month") or "unknown").strip().lower()
     client = sp.get("default_client") or "unknown"
-    name_part = emp_name.replace(" ", "_").lower()
+    name_part = normalize_employee_name(emp_name)
     return f"{emp_id}_{name_part}_{month}_{client}"
 
 
@@ -334,18 +367,31 @@ def _detect_month_from_folder_name(folder_name: str) -> Optional[str]:
     return None
 
 
+def _is_month_at_root_dir(folder_name: str) -> Optional[str]:
+    """
+    Return standard month (e.g. 'jun') if folder name is a month-at-root (e.g. 'june', '06', 'january').
+    Must not look like a category (so 'cab june' returns None; we use month-at-root only for plain month names).
+    """
+    lower = folder_name.lower().strip()
+    if _local_folder_to_category(lower):
+        return None
+    return _detect_month_from_folder_name(lower)
+
+
 def _walk_one_employee_dir(
     emp_dir: Path,
     emp_name: str,
     bill_extensions: Tuple[str, ...],
+    parent_month_override: Optional[str] = None,
 ) -> List[Tuple[str, str, str, List[str], Optional[str]]]:
     """
     Collect (emp_name, category, folder_path, file_paths, month_override) from one employee dir.
-    Supports subfolders like 'cab', 'cab june', 'meals', 'meals june' (month in name -> distinct output folder).
+    Supports subfolders like 'cab', 'cab june', 'meals', 'meals june'.
+    parent_month_override: when set (e.g. from month-at-root like resources/june/ashwini/), use for subfolders without month in name.
     """
     results: List[Tuple[str, str, str, List[str], Optional[str]]] = []
     sp = _sharepoint_settings()
-    default_month = sp.get("default_month") or "unknown"
+    default_month = parent_month_override or sp.get("default_month") or "unknown"
 
     # 1) Subfolders named by category (cab, cab june, meals, meals june, etc.) with bill/archive files inside
     for sub in emp_dir.iterdir():
@@ -382,6 +428,26 @@ def _walk_one_employee_dir(
     return results
 
 
+def _walk_month_at_root_dir(
+    month_dir: Path,
+    month_std: str,
+    bill_extensions: Tuple[str, ...],
+) -> List[Tuple[str, str, str, List[str], Optional[str]]]:
+    """Walk resources/june/ (month at root): each subdir is an employee (e.g. june/ashwini/cab, june/ashwini/meals)."""
+    results: List[Tuple[str, str, str, List[str], Optional[str]]] = []
+    for emp_entry in month_dir.iterdir():
+        if emp_entry.name.startswith(".") or emp_entry.name == "__MACOSX":
+            continue
+        if emp_entry.is_dir():
+            emp_name = emp_entry.name
+            results.extend(
+                _walk_one_employee_dir(
+                    emp_entry, emp_name, bill_extensions, parent_month_override=month_std
+                )
+            )
+    return results
+
+
 def walk_local_folders(
     resources_root: str,
     bill_extensions: Tuple[str, ...],
@@ -391,8 +457,9 @@ def walk_local_folders(
     Supports:
       - resources/{emp_name}/{category_folder}/files   (e.g. ashwini/cab/*.pdf, ashwini/cab june/*.pdf, meals, meals june)
       - resources/{emp_name}/{category_file}           (e.g. kartik/cab.zip at employee level)
-      - resources/{emp_name}.zip                       (employee folder as zip; extracted to temp and walked)
-    Month in folder name (e.g. 'cab june', 'meals june') produces a distinct output folder per month.
+      - resources/{month}/{emp_name}/{category}/files  (month at root: e.g. june/ashwini/cab/, january/kartik/meals/)
+      - resources/{emp_name}.zip                       (employee folder as zip; extracted and walked; supports single root dir in zip)
+    Month in folder name (e.g. 'cab june', 'meals june') or month at root (e.g. 'june', '06') produces distinct output per month.
     """
     results: List[Tuple[str, str, str, List[str], Optional[str]]] = []
     resources_path = Path(resources_root)
@@ -402,36 +469,84 @@ def walk_local_folders(
         if emp_entry.name.startswith("."):
             continue
         if emp_entry.is_dir():
-            emp_name = emp_entry.name
-            results.extend(_walk_one_employee_dir(emp_entry, emp_name, bill_extensions))
+            month_std = _is_month_at_root_dir(emp_entry.name)
+            if month_std is not None:
+                # Month at root: e.g. resources/june/ashwini/cab, resources/june/kartik/meals
+                results.extend(
+                    _walk_month_at_root_dir(emp_entry, month_std, bill_extensions)
+                )
+            else:
+                # Employee at root: e.g. resources/ashwini/cab, resources/ashwini/cab june
+                emp_name = emp_entry.name
+                results.extend(_walk_one_employee_dir(emp_entry, emp_name, bill_extensions))
         elif emp_entry.is_file() and emp_entry.name.lower().endswith(_archive_extensions()):
-            # 3) Employee folder as zip (e.g. resources/kartik.zip)
+            # 3) Employee folder as zip (e.g. resources/ashwini.zip or resources/kartik.zip)
             emp_name = emp_entry.stem
             with tempfile.TemporaryDirectory(prefix="sync_emp_") as tmp:
                 with zipfile.ZipFile(emp_entry, "r") as zf:
                     zf.extractall(tmp)
+                tmp_path = Path(tmp)
+                # If zip has a single top-level dir (e.g. ashwini.zip -> ashwini/cab, ashwini/cab june), use it as employee root
+                subdirs = [p for p in tmp_path.iterdir() if p.is_dir() and p.name != "__MACOSX"]
+                if len(subdirs) == 1:
+                    emp_root = subdirs[0]
+                else:
+                    emp_root = tmp_path
                 results.extend(
-                    _walk_one_employee_dir(Path(tmp), emp_name, bill_extensions)
+                    _walk_one_employee_dir(emp_root, emp_name, bill_extensions)
                 )
     return results
 
 
+def _unique_dest_path(
+    dest_dir: str,
+    duplicate_dir: str,
+    name: str,
+    src_path: Optional[str] = None,
+) -> Tuple[str, bool]:
+    """
+    Return (path, is_duplicate). If name already exists in dest_dir (and is not the source file),
+    place in duplicate_dir with stem_1.ext, stem_2.ext, ...
+    When src_path is given and dest would be the same file, return (dest, False) so we don't treat as duplicate.
+    """
+    dest = os.path.join(dest_dir, name)
+    if src_path and os.path.abspath(os.path.normpath(dest)) == os.path.abspath(os.path.normpath(src_path)):
+        return dest, False
+    if not os.path.exists(dest):
+        return dest, False
+    base, ext = os.path.splitext(name)
+    os.makedirs(duplicate_dir, exist_ok=True)
+    for n in range(1, 10000):
+        candidate = f"{base}_{n}{ext}"
+        dup_path = os.path.join(duplicate_dir, candidate)
+        if not os.path.exists(dup_path):
+            return dup_path, True
+    dup_path = os.path.join(duplicate_dir, f"{base}_dup{ext}")
+    return dup_path, True
+
+
 def copy_local_to_processed(
     processed_base: str,
+    duplicates_base: str,
     category: str,
     std_folder_name: str,
     file_paths: List[str],
 ) -> None:
     dest_dir = os.path.join(processed_base, category, std_folder_name)
+    duplicate_dir = os.path.join(duplicates_base, category, std_folder_name)
     os.makedirs(dest_dir, exist_ok=True)
     for src in file_paths:
         name = os.path.basename(src)
-        dest = os.path.join(dest_dir, name)
+        dest, is_duplicate = _unique_dest_path(dest_dir, duplicate_dir, name, src_path=src)
         if src != dest:
             shutil.copy2(src, dest)
-            print(f"  → {name}")
+            if is_duplicate:
+                print(f"  → [duplicates] {os.path.basename(dest)}  (duplicate of {name})")
+            else:
+                print(f"  → {name}")
+        unzip_target = os.path.dirname(dest)
         if _is_archive(name):
-            unzip_into(dest, dest_dir, remove_zip=True)
+            unzip_into(dest, unzip_target, remove_zip=True)
 
 
 def main_local() -> None:
@@ -450,13 +565,24 @@ def main_local() -> None:
         print("No bill folders found under resources (expected: resources/<emp_name>/<cab|meals|...>/files).")
         return
 
+    input_folders = len(entries)
+    input_files = sum(len(file_paths) for _, _, _, file_paths, _ in entries)
+
+    duplicates_dir = _duplicates_dir_from_config()
     for emp_name, category, folder_path, file_paths, month_override in entries:
         std_name = _build_standard_name_for_local(emp_name, category, month=month_override)
         print(f"\n{folder_path}")
         print(f"  → {std_name}")
-        copy_local_to_processed(processed_dir, category, std_name, file_paths)
+        copy_local_to_processed(processed_dir, duplicates_dir, category, std_name, file_paths)
 
-    print(f"\nDone. Run the app with: --resources-dir {os.path.relpath(processed_dir, PROJECT_ROOT)}")
+    print("\n" + "=" * 60)
+    print("Summary")
+    print("=" * 60)
+    print(f"  Input:  {input_folders} folder(s), {input_files} file(s)")
+    print(f"  Output: {input_folders} folder(s), {input_files} file(s)")
+    print(f"  Written to: {os.path.relpath(processed_dir, PROJECT_ROOT)}")
+    print("=" * 60)
+    print(f"\nRun the app with: --resources-dir {os.path.relpath(processed_dir, PROJECT_ROOT)}")
 
 
 def main():
@@ -477,6 +603,8 @@ def main():
     print(f"Walking SharePoint: {root_folder}")
     folder_entries = walk_sharepoint_folders(ctx, root_folder)
 
+    output_folders = 0
+    output_files = 0
     for folder_url, files in folder_entries:
         if not files:
             continue
@@ -500,16 +628,25 @@ def main():
 
         dest_base = _category_to_local_dir(category)
         dest_emp_folder = os.path.join(dest_base, std_folder_name)
+        duplicates_base = _duplicates_dir_from_config()
+        duplicate_emp_folder = os.path.join(duplicates_base, category, std_folder_name)
         print(f"\n{folder_url}")
         print(f"  → {std_folder_name}  (category and month in folder name)")
 
+        output_folders += 1
+        output_files += len(bill_files)
         for sp_file in bill_files:
-            local_path = download_file(ctx, sp_file, dest_emp_folder)
+            local_path = download_file(ctx, sp_file, dest_emp_folder, duplicate_emp_folder)
             if _is_archive(sp_file.name):
-                unzip_into(local_path, dest_emp_folder, remove_zip=True)
+                unzip_into(local_path, os.path.dirname(local_path), remove_zip=True)
 
     resources_dir = (config.get("paths") or {}).get("resources_dir", "resources")
-    print(f"\nDone. Check {resources_dir}/commute, {resources_dir}/meal, {resources_dir}/fuel.")
+    print("\n" + "=" * 60)
+    print("Summary")
+    print("=" * 60)
+    print(f"  Input:  (SharePoint) {output_folders} folder(s), {output_files} file(s) synced")
+    print(f"  Output: {resources_dir}/commute, {resources_dir}/meal, {resources_dir}/fuel — {output_folders} folder(s), {output_files} file(s)")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
