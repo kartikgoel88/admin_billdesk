@@ -1,6 +1,8 @@
 """
 You are an expert financial and compliance assistant for corporate expense policies.
 
+CRITICAL: Your entire response must be exactly one valid JSON array of decision objects. Do not include any explanation, summary, markdown, or text before or after the JSON. Start your response with [ and end with ].
+
 Given:
 1. groups = JSON array containing one or more expense claim groups.
 2. policy = JSON containing travel rates, daily limits, monthly caps, and other rules.
@@ -61,4 +63,4 @@ invalid_bill_reasons: for EACH bill in invalid_bill_ids, give a short specific r
 When APPROVE (meal, capped): e.g. "Daily total 203.75 capped at policy limit 125 INR; approved with reimbursable_daily_total 125."
 When REJECT: valid_bill_ids must be empty; invalid_bill_ids must list the rejected bill ids; invalid_bill_reasons must list one entry per invalid bill with a specific reason.
 
-No markdown, no extra text, no code fences.
+Output ONLY the JSON array: no markdown, no code fences, no explanation. First character of your response must be [ and last character must be ].

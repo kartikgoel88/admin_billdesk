@@ -25,6 +25,7 @@ class TestFuelValidator:
 
     def test_month_mismatch(self):
         v = FuelValidator()
+        ctx = {"config": {"validation": {"month_match_required": True}}}
         bill = {
             "filename": "f.pdf",
             "date": "15/02/2025",
@@ -32,12 +33,13 @@ class TestFuelValidator:
             "emp_name": "john",
             "employee_name": "John",
         }
-        result = v.validate(bill)
+        result = v.validate(bill, context=ctx)
         assert result["month_match"] is False
         assert result["is_valid"] is False
 
     def test_name_mismatch_low_score(self):
         v = FuelValidator()
+        ctx = {"config": {"validation": {"month_match_required": True, "name_match_threshold": 75}}}
         bill = {
             "filename": "f.pdf",
             "date": "15/01/2025",
@@ -45,7 +47,7 @@ class TestFuelValidator:
             "emp_name": "completely different person",
             "employee_name": "Someone Else",
         }
-        result = v.validate(bill)
+        result = v.validate(bill, context=ctx)
         assert result["month_match"] is True
         assert result["name_match"] is False
         assert result["is_valid"] is False
@@ -121,6 +123,7 @@ class TestMealValidator:
 
     def test_invalid_date_handled(self):
         v = MealValidator()
+        ctx = {"config": {"validation": {"month_match_required": True}}}
         bill = {
             "filename": "m.pdf",
             "date": "invalid",
@@ -128,7 +131,7 @@ class TestMealValidator:
             "emp_name": "a",
             "buyer_name": "a",
         }
-        result = v.validate(bill)
+        result = v.validate(bill, context=ctx)
         assert result["month_match"] is False
         assert result["is_valid"] is False
 
@@ -251,6 +254,8 @@ class TestRideValidator:
 
     def test_no_context_uses_empty_client_addresses(self):
         v = RideValidator()
+        # Explicit context with address check required but no client_addresses -> score 0, match False
+        ctx = {"config": {"validation": {"address_match_required": True, "address_match_threshold": 40}}}
         bill = {
             "filename": "r.pdf",
             "date": "01/01/2025",
@@ -261,7 +266,7 @@ class TestRideValidator:
             "pickup_address": "x",
             "drop_address": "y",
         }
-        result = v.validate(bill, context=None)
+        result = v.validate(bill, context=ctx)
         assert result["address_match_score"] == 0
         assert result["address_match"] is False
         assert result["is_valid"] is False

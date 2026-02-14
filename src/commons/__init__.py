@@ -7,11 +7,10 @@ Subpackages:
   ocr      - TextExtractor; add cloud OCR by implementing it
   folder   - FolderNameParser, FolderProcessor; add new naming schemes via new parsers
 
-Backward compatibility:
-  FileUtils, config, load_config (from commons.config), constants - unchanged API
+Public API: FileUtils, config, load_config, Constants; config_pkg, io_pkg, ocr_pkg, folder_pkg for extension.
 """
 
-from commons.FileUtils import FileUtils
+from commons.file_utils import FileUtils
 from commons.config import config, load_config
 from commons.constants import Constants
 

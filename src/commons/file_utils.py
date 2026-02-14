@@ -1,9 +1,8 @@
 """
-Backward-compatible facade over extendible commons.
+Facade over extendible commons (io, ocr, folder).
 
-All methods delegate to config, io, ocr, and folder components.
-To extend: use custom ConfigProvider, FileReader/FileWriter, TextExtractor, or FolderNameParser
-and pass them where supported, or replace the default instances below.
+All methods delegate to LocalFileReader/Writer, TesseractPdfExtractor, StandardFolderNameParser, LocalFolderProcessor.
+To extend: use custom FileReader/FileWriter, TextExtractor, or FolderNameParser and pass them where supported.
 """
 
 import json
@@ -25,7 +24,7 @@ _default_processor = LocalFolderProcessor(text_extractor=_default_extractor)
 
 
 class FileUtils:
-    """Facade for file, OCR, and folder operations. API unchanged for backward compatibility."""
+    """Facade for file, OCR, and folder operations."""
 
     @staticmethod
     def get_ocr_text_from_file(pdf_name: str, pdf_path: str) -> dict:

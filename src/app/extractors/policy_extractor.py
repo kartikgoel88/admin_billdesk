@@ -7,7 +7,7 @@ import httpx
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from commons.FileUtils import FileUtils
+from commons.file_utils import FileUtils
 from commons.config import config
 from commons.constants import Constants as Co
 from commons.llm import get_llm, get_llm_model_name

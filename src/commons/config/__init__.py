@@ -2,7 +2,6 @@
 
 from commons.config.loader import ConfigProvider, YamlConfigProvider, get_config
 
-# Default: single global config from YAML (backward compatible)
 _config_instance = None
 
 
@@ -14,7 +13,6 @@ def load_config(path=None):
     return _config_instance
 
 
-# Backward-compatible name
 config = load_config()
 
 __all__ = ["ConfigProvider", "YamlConfigProvider", "get_config", "load_config", "config"]

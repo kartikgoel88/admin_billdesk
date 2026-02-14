@@ -64,7 +64,7 @@ These patterns are already in the code; they are not obvious without a map. A sh
 - **Documents package removed.** No parallel `commons.documents` layer. Use **`commons.folder`** and **`commons.ocr`** only; `commons.FileUtils` wires them.
 - **Folder/parser:** Single implementation in `commons.folder.parser`.
 - **OCR:** Single implementation in `commons/ocr/tesseract_extractor.py`.
-- **Config:** Single source is `commons.config`; `commons.config_reader` is a legacy re-export only. Use it for new code.
+- **Config:** Single source is `commons.config` (and `load_config` for overrides).
 
 ---
 
@@ -92,9 +92,8 @@ These patterns are already in the code; they are not obvious without a map. A sh
 ### 4.4 Clarify “canonical” vs “legacy” paths
 
 - **Suggestion:** In docs (e.g. in ARCHITECTURE or README), state clearly:
-  - **Canonical:** `commons.folder`, `commons.ocr`, `commons.config`, `commons.io`, `commons.llm`, and `commons.FileUtils` for the facade.
-  - **Legacy / avoid for new code:** `commons.config_reader` (prefer `commons.config`).
-  - **Removed:** `commons.documents` no longer exists; use `commons.folder` and `commons.ocr` only.
+  - **Use:** `commons.folder`, `commons.ocr`, `commons.config`, `commons.io`, `commons.llm`, and `commons.file_utils.FileUtils` for the facade.
+  - **Removed:** `commons.documents` and `commons.config_reader` no longer exist; use `commons.config` and `commons.folder` / `commons.ocr` only.
 
 ### 4.5 Config and env
 
