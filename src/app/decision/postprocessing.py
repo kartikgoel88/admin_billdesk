@@ -39,12 +39,24 @@ def consolidate_invalid_reasons(d: Dict) -> str:
     return "; ".join(parts)
 
 
+def _normalize_category(cat: str) -> str:
+    """Canonical category for grouping: meal, commute, fuel. Handles LLM variants (Meal, cab, meals)."""
+    c = (cat or "unknown").strip().lower()
+    if c in ("cab", "commute"):
+        return "commute"
+    if c in ("meal", "meals"):
+        return "meal"
+    if c == "fuel":
+        return "fuel"
+    return c
+
+
 def group_decisions(decisions: List[Dict]) -> Dict:
-    """Group decisions by employee name, category, month for audit and summary."""
+    """Group decisions by employee name, category, month for audit and summary. Category normalized to meal/commute/fuel."""
     grouped: Dict = {}
     for d in decisions:
         name = f"{d.get('employee_id', '')}_{d.get('employee_name', '')}"
-        cat = d.get("category", "unknown")
+        cat = _normalize_category(d.get("category", ""))
         month = d.get("month", "unknown")
         grouped.setdefault(name, {}).setdefault(cat, {}).setdefault(month, []).append(d)
     return grouped
@@ -134,9 +146,10 @@ _PREPROCESSING_AMOUNT_KEYS = frozenset(
 
 
 def _normalize_decision_for_output(d: Dict) -> Dict:
-    """Return a copy of the decision with amount fields standardized (same as preprocessing); drop claimed_amount."""
+    """Return a copy of the decision with amount fields standardized; drop claimed_amount; canonical category."""
     out = dict(d)
     out.pop("claimed_amount", None)
+    out["category"] = _normalize_category(out.get("category", ""))
     return out
 
 

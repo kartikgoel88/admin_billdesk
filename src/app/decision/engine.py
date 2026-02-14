@@ -115,6 +115,8 @@ def _build_error_summary(invalid_bill_reasons: List[Dict]) -> List[Dict[str, Any
 
 def _enrich_decision_item(item: Dict, group: Dict) -> None:
     """Set currency, amounts (same fields as preprocessing), approved_amount, invalid_bill_reasons, error_summary."""
+    # Use canonical category from group so postprocessing summary has consistent keys (meal, commute, fuel)
+    item["category"] = (group.get("category") or item.get("category") or "unknown").strip().lower()
     currency = group.get("currency") or "INR"
     item["currency"] = currency
     # Same amount fields as preprocessing groups (for alignment in postprocessing output)
