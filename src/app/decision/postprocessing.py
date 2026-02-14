@@ -82,6 +82,9 @@ def build_summary_from_grouped(grouped: Dict) -> Dict:
                         r = normalize_reason(es.get("reason", ""))
                         reason_counts[r] = reason_counts.get(r, 0) + (es.get("count") or len(es.get("bill_ids") or []))
                 invalid_reasons = [{"reason": r, "count": c} for r, c in sorted(reason_counts.items())] if reason_counts else []
+                confidence_scores = [d.get("confidence_score") for d in items if d.get("confidence_score") is not None]
+                min_confidence = min(confidence_scores) if confidence_scores else None
+                any_manual_review = any(d.get("manual_review") for d in items)
                 entry = {
                     "decision": "REJECT" if any_reject else "APPROVE",
                     "claimed_amount": round(total_claimed, 2),
@@ -90,6 +93,8 @@ def build_summary_from_grouped(grouped: Dict) -> Dict:
                     "valid_bill_count": valid_count,
                     "invalid_bill_count": invalid_count,
                     "period_count": len(items),
+                    "min_confidence_score": round(min_confidence, 2) if min_confidence is not None else None,
+                    "manual_review": any_manual_review,
                 }
                 if invalid_reasons:
                     entry["invalid_reasons"] = invalid_reasons
@@ -101,17 +106,22 @@ def build_summary_from_grouped(grouped: Dict) -> Dict:
 # Copy files to valid/invalid dirs
 # -----------------------------------------------------------------------------
 
+FINAL_PROCESSED_INPUTS_DIR = "final_processed_inputs"
+
+
 def copy_files(
     save_data: List[Dict],
     output_dir: str,
     model_name: str,
     resources_dir: str,
 ) -> None:
-    """Copy bill files to valid/invalid directories per employee and category."""
+    """Copy bill files to valid/invalid dirs under model output: decisions/{model_name}/final_processed_inputs/{category}/."""
     print("\n📁 Copying files to valid/invalid directories...")
     resources_root = os.path.join(str(_PROJECT_ROOT), resources_dir)
-    valid_base = f"{output_dir}/{{category}}/{model_name}/valid_bills"
-    invalid_base = f"{output_dir}/{{category}}/{model_name}/invalid_bills"
+    # Place under model output: decisions/{model_name}/final_processed_inputs/{category}/valid_bills|invalid_bills
+    base = os.path.join(output_dir, "decisions", model_name, FINAL_PROCESSED_INPUTS_DIR)
+    valid_base = os.path.join(base, "{category}", "valid_bills")
+    invalid_base = os.path.join(base, "{category}", "invalid_bills")
 
     for emp in save_data:
         emp_id = emp.get("employee_id")
@@ -120,8 +130,8 @@ def copy_files(
         valid_files = emp.get("valid_files", [])
         invalid_files = emp.get("invalid_files", [])
 
-        emp_valid_dir = os.path.join(valid_base.replace("{category}", category), f"{emp_id}_{emp_name}")
-        emp_invalid_dir = os.path.join(invalid_base.replace("{category}", category), f"{emp_id}_{emp_name}")
+        emp_valid_dir = os.path.join(valid_base.format(category=category), f"{emp_id}_{emp_name}")
+        emp_invalid_dir = os.path.join(invalid_base.format(category=category), f"{emp_id}_{emp_name}")
         os.makedirs(emp_valid_dir, exist_ok=True)
         os.makedirs(emp_invalid_dir, exist_ok=True)
 
@@ -154,7 +164,7 @@ def _normalize_decision_for_output(d: Dict) -> Dict:
 
 
 def _summary_to_csv_rows(summary: Dict) -> list:
-    """Flatten summary dict to rows for CSV: emp_key, category, month, decision, amounts, counts, invalid_reasons."""
+    """Flatten summary dict to rows for CSV: emp_key, category, month, decision, amounts, counts, confidence, manual_review, invalid_reasons."""
     rows = []
     for emp_key, by_cat in summary.items():
         for category, by_month in by_cat.items():
@@ -174,6 +184,8 @@ def _summary_to_csv_rows(summary: Dict) -> list:
                     entry.get("valid_bill_count", 0),
                     entry.get("invalid_bill_count", 0),
                     entry.get("period_count", 0),
+                    entry.get("min_confidence_score", ""),
+                    entry.get("manual_review", False),
                     reasons_str,
                 ])
     return rows
@@ -233,7 +245,8 @@ def write_decision_outputs(
         writer = csv.writer(f)
         writer.writerow([
             "emp_key", "category", "month", "decision", "claimed_amount", "approved_amount",
-            "currency", "valid_bill_count", "invalid_bill_count", "period_count", "invalid_reasons",
+            "currency", "valid_bill_count", "invalid_bill_count", "period_count",
+            "min_confidence_score", "manual_review", "invalid_reasons",
         ])
         writer.writerows(_summary_to_csv_rows(summary))
     print(f"💾 Postprocessing summary (CSV) saved to: {summary_csv_path}")
@@ -242,7 +255,8 @@ def write_decision_outputs(
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write("# Postprocessing outputs\n\n")
         f.write("- **postprocessing_output.json** – Single file at employee level (same as preprocessing): _meta, meta, by_employee (each emp: decisions, summary by category/month).\n\n")
-        f.write("- **postprocessing_summary.csv** – Summary as CSV: emp_key, category, month, decision, claimed_amount, approved_amount, currency, valid_bill_count, invalid_bill_count, period_count, invalid_reasons.\n")
+        f.write("- **postprocessing_summary.csv** – Summary as CSV: emp_key, category, month, decision, claimed_amount, approved_amount, currency, valid_bill_count, invalid_bill_count, period_count, min_confidence_score, manual_review, invalid_reasons.\n\n")
+        f.write("- **final_processed_inputs/** (sibling folder) – Valid and invalid bill files copied per category and employee: `decisions/{model}/final_processed_inputs/{category}/valid_bills/{emp_key}/` and `.../invalid_bills/{emp_key}/`.\n")
     if employee_org_data:
         org_path = os.path.join(out_dir, "employee_org_data.json")
         with open(org_path, "w", encoding="utf-8") as f:

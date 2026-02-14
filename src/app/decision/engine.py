@@ -113,6 +113,36 @@ def _build_error_summary(invalid_bill_reasons: List[Dict]) -> List[Dict[str, Any
     return list(by_reason.values())
 
 
+# Threshold below which a decision is flagged for manual review
+CONFIDENCE_MANUAL_REVIEW_THRESHOLD = 0.5
+
+
+def _compute_confidence_score(group: Dict) -> float:
+    """
+    Compute confidence score (0–1) for a decision group.
+    Lower when important fields (month, amount) are missing or when bills are invalid,
+    so low-confidence decisions can be routed to manual review.
+    """
+    score = 1.0
+    month = (group.get("month") or "").strip().lower()
+    if not month or month == "unknown":
+        score -= 0.25
+    category = (group.get("category") or "").strip().lower()
+    if category == "meal":
+        amt = group.get("daily_total")
+    else:
+        amt = group.get("monthly_total")
+    if amt is None or (isinstance(amt, (int, float)) and amt == 0):
+        score -= 0.35
+    valid = group.get("valid_bills") or []
+    if not valid:
+        score -= 0.30
+    invalid = group.get("invalid_bills") or []
+    if invalid:
+        score -= 0.10 * min(1.0, len(invalid) / 3.0)
+    return max(0.0, min(1.0, score))
+
+
 def _enrich_decision_item(item: Dict, group: Dict) -> None:
     """Set currency, amounts (same fields as preprocessing), approved_amount, invalid_bill_reasons, error_summary."""
     # Use canonical category from group so postprocessing summary has consistent keys (meal, commute, fuel)
@@ -164,6 +194,10 @@ def _enrich_decision_item(item: Dict, group: Dict) -> None:
     ]
     item["invalid_bill_reasons"] = invalid_bill_reasons
     item["error_summary"] = _build_error_summary(invalid_bill_reasons)
+
+    confidence = _compute_confidence_score(group)
+    item["confidence_score"] = round(confidence, 2)
+    item["manual_review"] = confidence < CONFIDENCE_MANUAL_REVIEW_THRESHOLD
 
 
 # -----------------------------------------------------------------------------
