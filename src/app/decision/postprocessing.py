@@ -225,7 +225,7 @@ def write_decision_outputs(
         "decision_count": len(decisions),
         "grouped_employee_count": len(grouped),
         "summary_keys": list(summary.keys()),
-        "artifacts": ["postprocessing_output.json", "postprocessing_summary.csv", "README.md"],
+        "artifacts": ["postprocessing_output.json", "postprocessing_output_<category>.json", "postprocessing_summary.csv", "README.md"],
     }
     output = {
         "_meta": {
@@ -239,6 +239,40 @@ def write_decision_outputs(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2)
     print(f"\n💾 Postprocessing output saved to: {output_path} (meta + decisions + summary)")
+
+    # Per-category postprocessing JSON (same structure, decisions filtered by category)
+    categories_seen = set(_normalize_category(d.get("category", "")) for d in decisions)
+    for cat in sorted(categories_seen):
+        if not cat or cat == "unknown":
+            continue
+        decisions_cat = [d for d in decisions if _normalize_category(d.get("category", "")) == cat]
+        grouped_cat = group_decisions(decisions_cat)
+        summary_cat = build_summary_from_grouped(grouped_cat)
+        by_employee_cat: Dict[str, Dict[str, Any]] = {}
+        for d in decisions_cat:
+            emp_key = f"{d.get('employee_id', '')}_{d.get('employee_name', '')}"
+            if emp_key not in by_employee_cat:
+                by_employee_cat[emp_key] = {"decisions": [], "summary": {}}
+            by_employee_cat[emp_key]["decisions"].append(_normalize_decision_for_output(d))
+        for emp_key, emp_summary in summary_cat.items():
+            if emp_key not in by_employee_cat:
+                by_employee_cat[emp_key] = {"decisions": [], "summary": {}}
+            by_employee_cat[emp_key]["summary"] = emp_summary
+        meta_cat = {
+            "decision_count": len(decisions_cat),
+            "grouped_employee_count": len(grouped_cat),
+            "summary_keys": list(summary_cat.keys()),
+            "category": cat,
+        }
+        output_cat = {
+            "_meta": output["_meta"],
+            "meta": meta_cat,
+            "by_employee": by_employee_cat,
+        }
+        path_cat = os.path.join(out_dir, f"postprocessing_output_{cat}.json")
+        with open(path_cat, "w", encoding="utf-8") as f:
+            json.dump(output_cat, f, indent=2)
+        print(f"💾 Postprocessing output ({cat}) saved to: {path_cat}")
 
     summary_csv_path = os.path.join(out_dir, "postprocessing_summary.csv")
     with open(summary_csv_path, "w", newline="", encoding="utf-8") as f:
@@ -254,7 +288,8 @@ def write_decision_outputs(
     readme_path = os.path.join(out_dir, "README.md")
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write("# Postprocessing outputs\n\n")
-        f.write("- **postprocessing_output.json** – Single file at employee level (same as preprocessing): _meta, meta, by_employee (each emp: decisions, summary by category/month).\n\n")
+        f.write("- **postprocessing_output.json** – Single file at employee level (all categories): _meta, meta, by_employee (each emp: decisions, summary by category/month).\n\n")
+        f.write("- **postprocessing_output_{category}.json** – Same structure as above but filtered by category (e.g. postprocessing_output_meal.json, postprocessing_output_commute.json, postprocessing_output_fuel.json).\n\n")
         f.write("- **postprocessing_summary.csv** – Summary as CSV: emp_key, category, month, decision, claimed_amount, approved_amount, currency, valid_bill_count, invalid_bill_count, period_count, min_confidence_score, manual_review, invalid_reasons.\n\n")
         f.write("- **final_processed_inputs/** (sibling folder) – Valid and invalid bill files copied per category and employee: `decisions/{model}/final_processed_inputs/{category}/valid_bills/{emp_key}/` and `.../invalid_bills/{emp_key}/`.\n")
     if employee_org_data:

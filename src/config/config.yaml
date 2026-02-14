@@ -86,7 +86,7 @@ ocr:
 # API keys: set in .env (see .env.example). Config only lists env var names (api_key_env).
 # Use provider: ollama for local models (no API key; run scripts/run_local_llm.sh first).
 llm:
-  provider: groq
+  provider: openai
   temperature: 0
   default_model: 
   providers:

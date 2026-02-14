@@ -323,6 +323,7 @@ class BillDeskApp:
                 save_cat,
                 policy,
                 employee_org_data=org_data,
+                category=category,
             )
             all_decisions.extend(decisions_cat)
         return all_decisions

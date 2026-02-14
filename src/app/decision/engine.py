@@ -300,13 +300,16 @@ def write_engine_output(
     decisions: List[Dict],
     output_dir: str,
     model_name: str,
+    category: Optional[str] = None,
 ) -> None:
-    """Write engine raw LLM output only. Same level as preprocessing/postprocessing: decisions/{model_name}/engine/."""
+    """Write engine raw LLM output. Same level as preprocessing: decisions/{model_name}/engine/.
+    If category is provided, writes engine_raw_output_{category}.txt; otherwise engine_raw_output.txt."""
     base_dir = os.path.join(output_dir, "decisions", model_name)
     out_dir = os.path.join(base_dir, "engine")
     os.makedirs(out_dir, exist_ok=True)
 
-    raw_path = os.path.join(out_dir, "engine_raw_output.txt")
+    filename = f"engine_raw_output_{category}.txt" if category else "engine_raw_output.txt"
+    raw_path = os.path.join(out_dir, filename)
     with open(raw_path, "w", encoding="utf-8") as f:
         f.write(raw_output)
     print(f"\n📄 Engine raw output saved to: {raw_path}")
@@ -406,8 +409,10 @@ class DecisionEngine:
         save_data: List[Dict],
         policy: Dict,
         employee_org_data: Optional[Dict[str, Any]] = None,
+        category: Optional[str] = None,
     ) -> List[Dict]:
-        """Run only engine + copy (no preprocessing). Use when preprocessing was already run once for all categories."""
+        """Run only engine + copy (no preprocessing). Use when preprocessing was already run once for all categories.
+        If category is provided, engine raw output is written to engine_raw_output_{category}.txt."""
         if not groups_data:
             return []
         system_prompt = self._load_system_prompt()
@@ -420,7 +425,7 @@ class DecisionEngine:
             raw_output, groups_data,
             output_dir=self.output_dir, model_name=self.model_name,
         )
-        write_engine_output(raw_output, decisions, self.output_dir, self.model_name)
+        write_engine_output(raw_output, decisions, self.output_dir, self.model_name, category=category)
         copy_files(
             save_data,
             self.output_dir,
