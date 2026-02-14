@@ -85,6 +85,7 @@ def build_summary_from_grouped(grouped: Dict) -> Dict:
                 confidence_scores = [d.get("confidence_score") for d in items if d.get("confidence_score") is not None]
                 min_confidence = min(confidence_scores) if confidence_scores else None
                 any_manual_review = any(d.get("manual_review") for d in items)
+                parse_failed_count = sum(1 for d in items if d.get("parse_failed"))
                 entry = {
                     "decision": "REJECT" if any_reject else "APPROVE",
                     "claimed_amount": round(total_claimed, 2),
@@ -95,6 +96,7 @@ def build_summary_from_grouped(grouped: Dict) -> Dict:
                     "period_count": len(items),
                     "min_confidence_score": round(min_confidence, 2) if min_confidence is not None else None,
                     "manual_review": any_manual_review,
+                    "parse_failed_count": parse_failed_count,
                 }
                 if invalid_reasons:
                     entry["invalid_reasons"] = invalid_reasons
@@ -186,6 +188,7 @@ def _summary_to_csv_rows(summary: Dict) -> list:
                     entry.get("period_count", 0),
                     entry.get("min_confidence_score", ""),
                     entry.get("manual_review", False),
+                    entry.get("parse_failed_count", 0),
                     reasons_str,
                 ])
     return rows
@@ -280,7 +283,7 @@ def write_decision_outputs(
         writer.writerow([
             "emp_key", "category", "month", "decision", "claimed_amount", "approved_amount",
             "currency", "valid_bill_count", "invalid_bill_count", "period_count",
-            "min_confidence_score", "manual_review", "invalid_reasons",
+            "min_confidence_score", "manual_review", "parse_failed_count", "invalid_reasons",
         ])
         writer.writerows(_summary_to_csv_rows(summary))
     print(f"💾 Postprocessing summary (CSV) saved to: {summary_csv_path}")
@@ -290,7 +293,7 @@ def write_decision_outputs(
         f.write("# Postprocessing outputs\n\n")
         f.write("- **postprocessing_output.json** – Single file at employee level (all categories): _meta, meta, by_employee (each emp: decisions, summary by category/month).\n\n")
         f.write("- **postprocessing_output_{category}.json** – Same structure as above but filtered by category (e.g. postprocessing_output_meal.json, postprocessing_output_commute.json, postprocessing_output_fuel.json).\n\n")
-        f.write("- **postprocessing_summary.csv** – Summary as CSV: emp_key, category, month, decision, claimed_amount, approved_amount, currency, valid_bill_count, invalid_bill_count, period_count, min_confidence_score, manual_review, invalid_reasons.\n\n")
+        f.write("- **postprocessing_summary.csv** – Summary as CSV: emp_key, category, month, decision, claimed_amount, approved_amount, currency, valid_bill_count, invalid_bill_count, period_count, min_confidence_score, manual_review, parse_failed_count, invalid_reasons.\n\n")
         f.write("- **final_processed_inputs/** (sibling folder) – Valid and invalid bill files copied per category and employee: `decisions/{model}/final_processed_inputs/{category}/valid_bills/{emp_key}/` and `.../invalid_bills/{emp_key}/`.\n")
     if employee_org_data:
         org_path = os.path.join(out_dir, "employee_org_data.json")

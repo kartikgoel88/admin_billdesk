@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -226,6 +227,130 @@ def _invoke_decision_llm(
     return chain.invoke({"system_prompt": system_prompt, "user_prompt": user_prompt})
 
 
+def _repair_json_string(s: str) -> str:
+    """Try to fix common JSON issues: trailing commas, truncated arrays/objects."""
+    if not s or not s.strip():
+        return s
+    t = s.strip()
+    # Trailing comma before ] or }
+    t = re.sub(r",\s*\]", "]", t)
+    t = re.sub(r",\s*}", "}", t)
+    # Truncation: ends with comma or incomplete - close array/object
+    if t.endswith(","):
+        t = t[:-1].rstrip()
+    depth_a = t.count("[") - t.count("]")
+    depth_b = t.count("{") - t.count("}")
+    if depth_a > 0 or depth_b > 0:
+        t = t + "]" * depth_a + "}" * depth_b
+    return t
+
+
+def _find_balanced_array(s: str, start: int) -> Optional[str]:
+    """Given index of '[' in s, return substring for the balanced [...] (or None)."""
+    if start < 0 or start >= len(s) or s[start] != "[":
+        return None
+    depth = 1
+    i = start + 1
+    in_string = False
+    escape = False
+    quote = None
+    while i < len(s) and depth > 0:
+        c = s[i]
+        if escape:
+            escape = False
+            i += 1
+            continue
+        if c == "\\" and in_string:
+            escape = True
+            i += 1
+            continue
+        if in_string:
+            if c == quote:
+                in_string = False
+            i += 1
+            continue
+        if c in ('"', "'"):
+            in_string = True
+            quote = c
+            i += 1
+            continue
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                return s[start : i + 1]
+        i += 1
+    return None
+
+
+def _extract_decisions_from_llm_output(output: str) -> Tuple[Optional[List[Dict]], Optional[str]]:
+    """Extract and parse decision list from LLM output. Tries extract -> parse -> repair -> parse.
+    Returns (raw_decisions_list, error_message). raw_decisions_list is None on total failure."""
+    if not output or not isinstance(output, str):
+        return None, "empty or invalid output"
+    data = None
+    json_str = _extract_json_from_llm_output(output)
+    if json_str:
+        try:
+            data = json.loads(json_str)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            repaired = _repair_json_string(json_str)
+            try:
+                data = json.loads(repaired)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+    if data is None:
+        # No JSON found by extractor or decode failed: try to find decisions array by bracket matching
+        candidates: List[str] = []
+        if '"decisions"' in output:
+            idx = output.find('"decisions"')
+            bracket = output.find("[", idx)
+            if bracket != -1:
+                candidate = _find_balanced_array(output, bracket)
+                if candidate:
+                    candidates.append(candidate)
+        if not candidates:
+            bracket = output.find("[")
+            if bracket != -1:
+                candidate = _find_balanced_array(output, bracket)
+                if candidate:
+                    candidates.append(candidate)
+        for candidate in candidates:
+            try:
+                data = json.loads(candidate)
+                break
+            except (json.JSONDecodeError, TypeError, ValueError):
+                repaired = _repair_json_string(candidate)
+                try:
+                    data = json.loads(repaired)
+                    break
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    continue
+        else:
+            data = None
+    if data is None:
+        return None, "no JSON array found in response."
+
+    # Normalize to list of decision objects
+    if isinstance(data, dict) and "decisions" in data:
+        raw_decisions = data.get("decisions")
+    elif isinstance(data, list):
+        raw_decisions = data
+    else:
+        return None, "response is not a JSON array or {decisions: [...]}."
+    if not isinstance(raw_decisions, list):
+        return None, "decisions field is not a list."
+    # Ensure items are dicts; replace non-dict with placeholder
+    out: List[Dict] = []
+    for i, item in enumerate(raw_decisions):
+        if isinstance(item, dict):
+            out.append(item)
+        else:
+            out.append({"decision": "REJECT", "reasons": [f"Item {i} was not a valid object (parse_failed)."]})
+    return out, None
+
+
 def _report_parse_failure(
     output: str,
     reason: str,
@@ -234,7 +359,6 @@ def _report_parse_failure(
 ) -> None:
     """Print why parsing failed and show the unparsed output (snippet + path to full file)."""
     print(f"\n⚠️ Decision output parse failed: {reason}")
-    print("No auto-approve; returning no decisions. Fix the prompt or model so it returns a single JSON array.")
     path_hint = ""
     if output_dir and model_name:
         rel_path = os.path.join(output_dir, "decisions", model_name, "engine", "engine_raw_output.txt")
@@ -254,45 +378,86 @@ def _report_parse_failure(
         print("--- End ---")
 
 
+def _make_parse_failed_placeholder(group: DecisionGroup) -> Dict[str, Any]:
+    """Build a decision item for a group that had no valid LLM decision (parse failed or count mismatch)."""
+    g = group.to_dict()
+    valid = g.get("valid_bills") or []
+    invalid = g.get("invalid_bills") or []
+    return {
+        "decision": "REJECT",
+        "parse_failed": True,
+        "employee_id": g.get("employee_id", ""),
+        "employee_name": g.get("employee_name", ""),
+        "category": g.get("category", "unknown"),
+        "valid_bill_ids": list(valid),
+        "invalid_bill_ids": list(invalid),
+        "invalid_bill_reasons": [],
+        "claimed_amount": 0,
+        "approved_amount": 0,
+        "currency": g.get("currency", "INR"),
+        "reasons": ["Decision output parse failed; sent to manual review."],
+    }
+
+
 def _parse_and_enrich_decisions(
     output: str,
     groups_data: List[DecisionGroup],
     output_dir: Optional[str] = None,
     model_name: Optional[str] = None,
 ) -> List[Dict]:
-    """Parse LLM output as JSON list and enrich each item. On parse failure report the unparsed output and return [] (no auto-approve)."""
-    json_str = _extract_json_from_llm_output(output)
-    if json_str is None:
-        _report_parse_failure(output, "no JSON array found in response.", output_dir, model_name)
-        return []
-    try:
-        data = json.loads(json_str)
-    except (json.JSONDecodeError, TypeError, ValueError) as e:
-        _report_parse_failure(output, f"JSON decode error: {e}", output_dir, model_name)
-        return []
-    # Normalize: json_schema returns {"decisions": [...]}; raw array also supported
-    if isinstance(data, dict) and "decisions" in data:
-        decisions = data["decisions"]
-    elif isinstance(data, list):
-        decisions = data
-    else:
-        _report_parse_failure(output, "response is not a JSON array or {decisions: [...]}.", output_dir, model_name)
-        return []
-    if not isinstance(decisions, list):
-        _report_parse_failure(output, "response is not a JSON array.", output_dir, model_name)
-        return []
-    if len(decisions) != len(groups_data):
-        _report_parse_failure(
-            output,
-            f"expected {len(groups_data)} decision(s), got {len(decisions)}.",
-            output_dir,
-            model_name,
-        )
-        return []
-    for i, item in enumerate(decisions):
-        group_dict = groups_data[i].to_dict() if i < len(groups_data) else {}
-        _enrich_decision_item(item, group_dict)
-    return decisions
+    """Parse LLM output as JSON list and enrich each item. Uses repair/fallback parsing.
+    On full parse failure returns placeholders for all groups (parse_failed). On count mismatch or per-item failure: continue with parsed items and add parse_failed placeholders for missing/failed ones."""
+    raw_decisions, parse_error = _extract_decisions_from_llm_output(output)
+    if raw_decisions is None:
+        _report_parse_failure(output, parse_error or "unknown", output_dir, model_name)
+        # Return one parse_failed placeholder per group so we still produce output (e.g. meal) instead of []
+        print("📋 Using parse_failed placeholders for all groups (manual review).")
+        result: List[Dict] = []
+        for group in groups_data:
+            item = _make_parse_failed_placeholder(group)
+            _enrich_decision_item(item, group.to_dict())
+            item["parse_failed"] = True
+            result.append(item)
+        return result
+
+    n_groups = len(groups_data)
+    n_parsed = len(raw_decisions)
+    if n_parsed != n_groups:
+        print(f"\n⚠️ Decision count mismatch: expected {n_groups} decision(s), got {n_parsed}. Filling missing with parse_failed placeholders.")
+
+    result: List[Dict] = []
+    for i in range(n_groups):
+        group = groups_data[i]
+        group_dict = group.to_dict()
+        if i >= n_parsed:
+            # No LLM decision for this group
+            item = _make_parse_failed_placeholder(group)
+            _enrich_decision_item(item, group_dict)
+            item["parse_failed"] = True
+            result.append(item)
+            continue
+        item = raw_decisions[i]
+        if not isinstance(item, dict):
+            item = _make_parse_failed_placeholder(group)
+            _enrich_decision_item(item, group_dict)
+            item["parse_failed"] = True
+            result.append(item)
+            continue
+        try:
+            _enrich_decision_item(item, group_dict)
+            item["parse_failed"] = False
+            result.append(item)
+        except Exception as e:
+            print(f"⚠️ Enrich failed for group index {i} ({group.employee_id}/{group.category}): {e}. Using parse_failed placeholder.")
+            item = _make_parse_failed_placeholder(group)
+            _enrich_decision_item(item, group_dict)
+            item["parse_failed"] = True
+            result.append(item)
+
+    n_failed = sum(1 for r in result if r.get("parse_failed"))
+    if n_failed:
+        print(f"📋 Decisions: {len(result)} total, {n_failed} marked parse_failed (manual review).")
+    return result
 
 
 def write_engine_output(
