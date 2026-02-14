@@ -240,51 +240,39 @@ def write_preprocessing_output(
     output_dir: str,
     model_name: str,
 ) -> str:
-    """Write pre-processing result to JSON at employee level (by_employee). Merges with existing file so all categories (commute, meal, fuel) are present, same as postprocessing."""
+    """Write pre-processing result once. Category at top level: by_category -> commute/meal/fuel -> by_employee -> groups, save_data."""
     base_dir = os.path.join(output_dir, "decisions", model_name)
     out_dir = os.path.join(base_dir, "preprocessing")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "preprocessing_output.json")
 
-    # Build this run's by_employee. No approval decision here — only amounts (daily_total, monthly_total, etc.).
-    # approved_amount is set later by the engine/postprocessing after the LLM decision (APPROVE/REJECT).
-    by_employee: Dict[str, Dict[str, Any]] = {}
+    # Category at high level: by_category[cat] = { by_employee: {...}, group_count, save_entries_count }
+    by_category: Dict[str, Dict[str, Any]] = {}
     for g in groups_data:
+        cat = (g.category or "unknown").strip().lower()
+        if cat not in by_category:
+            by_category[cat] = {"by_employee": {}, "group_count": 0, "save_entries_count": 0}
         emp_key = f"{g.employee_id}_{g.employee_name}"
-        if emp_key not in by_employee:
-            by_employee[emp_key] = {"groups": [], "save_data": []}
-        by_employee[emp_key]["groups"].append(g.to_dict())
+        if emp_key not in by_category[cat]["by_employee"]:
+            by_category[cat]["by_employee"][emp_key] = {"groups": [], "save_data": []}
+        by_category[cat]["by_employee"][emp_key]["groups"].append(g.to_dict())
+        by_category[cat]["group_count"] = by_category[cat]["group_count"] + 1
     for entry in save_data:
+        cat = (entry.get("category") or "unknown").strip().lower()
+        if cat not in by_category:
+            by_category[cat] = {"by_employee": {}, "group_count": 0, "save_entries_count": 0}
         emp_key = f"{entry['employee_id']}_{entry['employee_name']}"
-        if emp_key not in by_employee:
-            by_employee[emp_key] = {"groups": [], "save_data": []}
-        by_employee[emp_key]["save_data"].append(entry)
-
-    # Merge with existing file (engine runs per category, so we accumulate commute + meal + fuel)
-    existing_count = 0
-    existing_save_count = 0
-    if os.path.isfile(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                existing = json.load(f)
-            existing_by = existing.get("by_employee") or {}
-            for emp_key, data in by_employee.items():
-                if emp_key not in existing_by:
-                    existing_by[emp_key] = {"groups": [], "save_data": []}
-                existing_by[emp_key]["groups"].extend(data["groups"])
-                existing_by[emp_key]["save_data"].extend(data["save_data"])
-            by_employee = existing_by
-            existing_count = existing.get("group_count", 0)
-            existing_save_count = existing.get("save_entries_count", 0)
-        except (json.JSONDecodeError, OSError):
-            pass
+        if emp_key not in by_category[cat]["by_employee"]:
+            by_category[cat]["by_employee"][emp_key] = {"groups": [], "save_data": []}
+        by_category[cat]["by_employee"][emp_key]["save_data"].append(entry)
+        by_category[cat]["save_entries_count"] = by_category[cat]["save_entries_count"] + 1
 
     payload = {
-        "by_employee": by_employee,
-        "group_count": existing_count + len(groups_data),
-        "save_entries_count": existing_save_count + len(save_data),
+        "by_category": by_category,
+        "group_count": len(groups_data),
+        "save_entries_count": len(save_data),
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
-    print(f"\n📄 Pre-processing output saved to: {path}")
+    print(f"\n📄 Pre-processing output saved to: {path} (once for all categories)")
     return path

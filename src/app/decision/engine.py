@@ -366,6 +366,35 @@ class DecisionEngine:
 
         return decisions
 
+    def run_with_prepared(
+        self,
+        groups_data: List[DecisionGroup],
+        save_data: List[Dict],
+        policy: Dict,
+        employee_org_data: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict]:
+        """Run only engine + copy (no preprocessing). Use when preprocessing was already run once for all categories."""
+        if not groups_data:
+            return []
+        system_prompt = self._load_system_prompt()
+        raw_output = _invoke_decision_llm(
+            self.llm, system_prompt, policy, groups_data, employee_org_data
+        )
+        print("\n📄 Decision Output (raw):")
+        print(raw_output)
+        decisions = _parse_and_enrich_decisions(
+            raw_output, groups_data,
+            output_dir=self.output_dir, model_name=self.model_name,
+        )
+        write_engine_output(raw_output, decisions, self.output_dir, self.model_name)
+        copy_files(
+            save_data,
+            self.output_dir,
+            self.model_name,
+            self.resources_dir,
+        )
+        return decisions
+
     def _load_system_prompt(self) -> str:
         """Override to load prompt from another source (e.g. remote)."""
         return FileUtils.load_text_file(self._system_prompt_path) or ""

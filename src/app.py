@@ -274,22 +274,55 @@ class BillDeskApp:
         write_postprocessing_output(decisions, base, self.config.model_name)
 
     def _run_decision_engine_per_category(self, policy: Dict) -> List[Dict]:
-        """Run decision engine separately per category so decision data are not mixed."""
+        """Preprocessing once for all categories, write once; then run decision engine per category with prepared data."""
+        from app.decision.preprocessing import run_preprocessing, write_preprocessing_output
+
         all_decisions: List[Dict] = []
         org_data = self.employee_org_data if self.employee_org_data else None
+
+        # 1. Preprocessing once for all bills (all categories)
+        if not self.all_bills:
+            return all_decisions
+        print("\n⚖️ Running pre-processing (once for all categories)...")
+        groups_data_all, save_data_all = run_preprocessing(
+            self.all_bills,
+            policy,
+            category_filter=None,
+            policy_extractor=self.decision_engine.policy_extractor if self.decision_engine else None,
+            enable_rag=self.config.enable_rag,
+        )
+        if not groups_data_all:
+            print("❌ No groups from preprocessing")
+            return all_decisions
+        write_preprocessing_output(
+            groups_data_all, save_data_all,
+            _output_dir_absolute(self.config.output_dir), self.config.model_name,
+        )
+
+        # 2. Split by category for per-category decision runs
+        groups_by_cat: Dict[str, list] = {c: [] for c in EXPENSE_CATEGORIES}
+        for g in groups_data_all:
+            cat = (g.category or "unknown").strip().lower()
+            if cat in groups_by_cat:
+                groups_by_cat[cat].append(g)
+        save_by_cat: Dict[str, list] = {c: [] for c in EXPENSE_CATEGORIES}
+        for s in save_data_all:
+            cat = (s.get("category") or "unknown").strip().lower()
+            if cat in save_by_cat:
+                save_by_cat[cat].append(s)
+
+        # 3. Run decision engine per category (LLM + copy only; no preprocessing)
         for category in EXPENSE_CATEGORIES:
-            bills_for_cat = {
-                k: [b for b in v if (b.get("category") or "").strip().lower() == category]
-                for k, v in self.all_bills.items()
-            }
-            bills_for_cat = {k: v for k, v in bills_for_cat.items() if v}
-            if not bills_for_cat:
+            groups_cat = groups_by_cat.get(category) or []
+            save_cat = save_by_cat.get(category) or []
+            if not groups_cat:
                 continue
-            decisions_cat = self.decision_engine.run(
-                bills_for_cat,
+            print(f"\n⚖️ Running decision engine for category: {category}...")
+            decisions_cat = self.decision_engine.run_with_prepared(
+                groups_cat,
+                save_cat,
                 policy,
                 employee_org_data=org_data,
-                category_filter=category,
             )
             all_decisions.extend(decisions_cat)
         return all_decisions
