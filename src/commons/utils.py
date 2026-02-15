@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 import shutil
+import json
+import re
+import ast  
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -115,3 +118,71 @@ def copy_files_matching(
             shutil.copy(src_path, os.path.join(dest_dir, fname))
             count += 1
     return count
+
+# -----------------------------------------------------------------------------
+# LLM output parsing
+# -----------------------------------------------------------------------------
+
+def extract_json_from_llm_output(text: str) -> str | None:
+    if not text or not isinstance(text, str):
+        return None
+    s = text.strip()
+    if "```" in s:
+        m = re.search(r"```(?:json)?\s*([\s\S]*?)```", s)
+        if m:
+            s = m.group(1).strip()
+    try:
+        data = json.loads(s)
+        if isinstance(data, str) and data.strip().startswith(("[", "{")):
+            try:
+                parsed = ast.literal_eval(data)
+                if isinstance(parsed, (list, dict)):
+                    return json.dumps(parsed)
+            except (ValueError, SyntaxError, TypeError):
+                pass
+        return s
+    except (json.JSONDecodeError, TypeError):
+        pass
+    for fix in [
+        lambda x: re.sub(r'(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)"\s*:', r'\1"\2":', x),
+        lambda x: re.sub(r"'([^']*)'\s*:", r'"\1":', x),
+    ]:
+        try:
+            out = fix(s)
+            json.loads(out)
+            return out
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if s.startswith("[") or s.startswith("{"):
+        try:
+            parsed = ast.literal_eval(s)
+            if isinstance(parsed, (list, dict)):
+                return json.dumps(parsed)
+        except (ValueError, SyntaxError, TypeError):
+            pass
+    for pattern in (r"\[[\s\S]*\]", r"\{[\s\S]*\}"):
+        m = re.search(pattern, s)
+        if m:
+            cand = m.group(0)
+            try:
+                json.loads(cand)
+                return cand
+            except (json.JSONDecodeError, TypeError):
+                pass
+            for fix in [
+                lambda x: re.sub(r'(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)"\s*:', r'\1"\2":', x),
+                lambda x: re.sub(r"'([^']*)'\s*:", r'"\1":', x),
+            ]:
+                try:
+                    out = fix(cand)
+                    json.loads(out)
+                    return out
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            try:
+                parsed = ast.literal_eval(cand)
+                if isinstance(parsed, (list, dict)):
+                    return json.dumps(parsed)
+            except (ValueError, SyntaxError, TypeError):
+                continue
+    return None
