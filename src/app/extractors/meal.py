@@ -2,7 +2,7 @@
 
 from entity.meal_extraction_schema import MealExtractionList
 
-from app.extractors.base_extractor import BaseInvoiceExtractor
+from app.extractors.base import BaseInvoiceExtractor
 
 
 class MealExtractor(BaseInvoiceExtractor):

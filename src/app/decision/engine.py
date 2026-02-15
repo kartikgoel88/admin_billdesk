@@ -15,7 +15,7 @@ from commons.file_utils import FileUtils
 from commons.llm import get_llm
 
 from entity.employee import DecisionGroup
-from app.extractors.base_extractor import _extract_json_from_llm_output
+from app.extractors.base import extract_json_from_llm_output
 
 from app.decision.preprocessing import run_preprocessing, write_preprocessing_output
 from app.decision.postprocessing import copy_files
@@ -290,7 +290,7 @@ def _extract_decisions_from_llm_output(output: str) -> Tuple[Optional[List[Dict]
     if not output or not isinstance(output, str):
         return None, "empty or invalid output"
     data = None
-    json_str = _extract_json_from_llm_output(output)
+    json_str = extract_json_from_llm_output(output)
     if json_str:
         try:
             data = json.loads(json_str)

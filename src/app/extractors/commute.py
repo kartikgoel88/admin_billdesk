@@ -6,7 +6,7 @@ from commons.config import config
 from entity.ride_extraction_schema import RideExtractionList
 
 from app.extractors._paths import project_path
-from app.extractors.base_extractor import BaseInvoiceExtractor
+from app.extractors.base import BaseInvoiceExtractor
 
 
 class CommuteExtractor(BaseInvoiceExtractor):

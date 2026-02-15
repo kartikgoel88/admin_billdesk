@@ -25,11 +25,11 @@ This document maps reusable building blocks in the repo and suggests how to make
 
 | Area | Purpose | Protocol / base | Implementations | Registration |
 |------|---------|----------------|-----------------|--------------|
-| **Extractors** | Run LLM extraction + validation on a folder | `InvoiceExtractor`, `PolicyExtractor` (`extractors/base.py`) | `BaseInvoiceExtractor` (shared logic) → `MealExtractor`, `CommuteExtractor`, `FuelExtractor` | `EXTRACTOR_REGISTRY`, `get_extractor()` |
+| **Extractors** | Run LLM extraction + validation on a folder | `InvoiceExtractor`, `PolicyExtractor` (`extractors/base.py`) | `BaseInvoiceExtractor` → `MealExtractor`, `CommuteExtractor`, `FuelExtractor` | `extractor_registry.get()`, `extractor_registry.register()` |
 | **Validation** | Validate one bill (month, name, amount, etc.) | `BillValidator` (`validation/base.py`) | `MealValidator`, `RideValidator`, `FuelValidator` | `VALIDATOR_REGISTRY`, `get_validator()` |
 | **Decision engine** | Group bills, LLM approve/reject, copy to valid/invalid | — | `engine.py` | Used from `app.py` |
 
-**Shared extractor logic:** `BaseInvoiceExtractor` (`extractors/base_extractor.py`) — init (folder, OCR lookup, prompt, chain), `_enrich`, `_validate`, `run()` loop. Category-specific extractors only pass `category`, `validator_category`, prompt path, and schema, and optionally override `_extra_init()` and `_validation_context()`.
+**Shared extractor logic:** `BaseInvoiceExtractor` (`extractors/base.py`) — init (folder, OCR lookup, prompt, chain), `_enrich`, `_validate`, `run()` loop. Category-specific extractors only pass `category`, `validator_category`, prompt path, and schema, and optionally override `_extra_init()` and `_validation_context()`.
 
 **Shared validation helpers:** `app/validation/_common.py` — `MONTH_MAP`, `parse_amount()`, `amount_limit_from_policy()`, `get_validation_params()`, `ensure_bill_id()`, `apply_amount_cap()`, `month_match()`. All validators use these instead of reimplementing.
 
@@ -52,7 +52,7 @@ This document maps reusable building blocks in the repo and suggests how to make
   - Add a Pydantic schema under `entity/`.  
   - Subclass `BaseInvoiceExtractor` with the right `category`, `validator_category`, prompt path, and schema.  
   - Implement `BillValidator` and register it in `validation/__init__.py` (`VALIDATOR_REGISTRY`).  
-  - Register the extractor in `extractors/__init__.py` (`EXTRACTOR_REGISTRY`).
+  - Register in `extractors/__init__.py`: `extractor_registry.register("category", MyExtractor)`.
 - **New LLM provider:** Add a `_build_<name>` in `llm/factory.py` and register it in `_BUILDERS`.
 
 These patterns are already in the code; they are not obvious without a map. A short “Extension guide” (see below) would make this clear.
@@ -121,7 +121,7 @@ This way, “reusable code” is not only listed but also shown in use.
 | Change where files are read/written | `commons.io.base` (protocols), `commons.io.local` (default), `FileUtils` (facade) |
 | Change OCR (e.g. different engine) | `commons.ocr.base` (`TextExtractor`), `commons.ocr.tesseract_extractor`, `LocalFolderProcessor(text_extractor=...)` |
 | Change folder naming rules | `commons.folder.parser` — `FolderNameParser`, `StandardFolderNameParser` |
-| Add a new bill type | `app.extractors.base_extractor.BaseInvoiceExtractor`, `app.extractors` registry; `app.validation` (validator + registry) |
+| Add a new bill type | `app.extractors.base.BaseInvoiceExtractor`, `app.extractors` registry; `app.validation` (validator + registry) |
 | Change LLM provider/model | `commons.llm.factory` — `get_llm()`, `_BUILDERS`; config `llm.provider`, `llm.providers` |
 | Reuse validation rules (month, amount, name) | `app.validation._common` |
 | Understand the main app flow | `src/app.py` → extractors and/or decision engine |

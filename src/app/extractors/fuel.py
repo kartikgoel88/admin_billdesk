@@ -2,7 +2,7 @@
 
 from entity.fuel_extraction_schema import FuelExtractionList
 
-from app.extractors.base_extractor import BaseInvoiceExtractor
+from app.extractors.base import BaseInvoiceExtractor
 
 
 class FuelExtractor(BaseInvoiceExtractor):

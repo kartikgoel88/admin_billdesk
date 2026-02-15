@@ -2,31 +2,29 @@
 Extendible app package: extractors, validation, decision engine.
 
 Subpackages:
-  extractors  - InvoiceExtractor / PolicyExtractor; register new categories via register_extractor
+  extractors  - InvoiceExtractor / PolicyExtractor; register via extractor_registry
   validation   - BillValidator; register via register_validator
   decision     - DecisionEngine (injectable prompt path, policy_extractor for RAG)
 """
 
 from app.extractors import (
     CommuteExtractor,
+    FuelExtractor,
     MealExtractor,
     BasePolicyExtractor,
-    get_extractor,
-    register_extractor,
-    EXTRACTOR_REGISTRY,
+    extractor_registry,
 )
 from app.validation import get_validator, register_validator, VALIDATOR_REGISTRY
 from app.decision import DecisionEngine
 
 __all__ = [
     "CommuteExtractor",
+    "FuelExtractor",
     "MealExtractor",
     "BasePolicyExtractor",
     "DecisionEngine",
-    "get_extractor",
-    "register_extractor",
+    "extractor_registry",
     "get_validator",
     "register_validator",
-    "EXTRACTOR_REGISTRY",
     "VALIDATOR_REGISTRY",
 ]

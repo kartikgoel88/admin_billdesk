@@ -39,14 +39,13 @@ from commons.config import config
 from commons.llm import get_llm_model_name
 
 from app.extractors._paths import project_path
-from app.extractors import EXTRACTOR_REGISTRY, get_extractor
+from app.extractors import extractor_registry
 from app.decision import DecisionEngine
 from app.rag import PolicyExtractorWithRAG
 from app.decision.postprocessing import write_decision_outputs, write_postprocessing_output
 from app.org_api import get_org_client
 
-# Single source of truth for expense categories (matches extractor registry)
-EXPENSE_CATEGORIES = tuple(EXTRACTOR_REGISTRY.keys())
+EXPENSE_CATEGORIES = tuple(extractor_registry.categories())
 
 
 def _output_dir_absolute(output_dir: str) -> str:
@@ -202,7 +201,7 @@ class BillDeskApp:
             if not folder_list or (self.args.category and self.args.category != category):
                 continue
             for folder_path in folder_list:
-                extractor = get_extractor(
+                extractor = extractor_registry.get(
                     category,
                     input_folder=folder_path,
                     system_prompt_path=category_to_prompt.get(category),

@@ -10,16 +10,16 @@ Orchestration, extractors, validation, and decision engine. Import from `app.ext
 2. **Validator** (optional): Implement `BillValidator` (implement `validate(bill, context) -> dict`). See `app.validation.ride_validator` or `meal_validator`.
 3. **Register**:
    ```python
-   from app.extractors import register_extractor
+   from app.extractors import extractor_registry
    from app.validation import register_validator
-   register_extractor("fuel", FuelExtractor)
+   extractor_registry.register("fuel", FuelExtractor)
    register_validator("fuel", FuelValidator())
    ```
 4. **Orchestration**: Add `"fuel"` to the categories loop in `BillDeskApp.process_employee` and to folder discovery if you use a new folder name (e.g. `resources/fuel/`).
 
 ### Policy extractor
 
-- **Protocol**: `PolicyExtractor` in `app.extractors.base` (`run() -> dict | None`, `get_policy_text() -> str | None`).
+- **Protocol**: `PolicyExtractor` in `app.extractors.base` (`run() -> dict | None`, `get_policy_text() -> str | None`). Same module has `BaseInvoiceExtractor` and registry.
 - **Default**: `app.extractors.policy_extractor.PolicyExtractor` (PDF via OCR + LLM).
 - Replace or wrap (e.g. with RAG) in the orchestrator; no registry needed.
 
