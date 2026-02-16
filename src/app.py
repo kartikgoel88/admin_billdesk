@@ -17,6 +17,7 @@ Usage:
     python src/app.py --resources-dir resources/processed_inputs
     python src/app.py --employee IIIPL-1000_naveen_oct_amex --category commute
     python src/app.py --decision-only
+    python src/app.py --decision-only --employee IIIPL-1000   # decision only for one employee
 """
 
 import os
@@ -81,6 +82,7 @@ def _resolve_policy_path(resources_dir: str) -> str:
 
 def _filter_employees_by_arg(employees: Dict[str, Dict[str, List[str]]], employee_arg: str) -> Dict[str, Dict[str, List[str]]]:
     """Filter employees by --employee (partial match on key or name). Returns subset or same dict if no match needed."""
+    employee_arg = (employee_arg or "").strip()
     if not employee_arg:
         return employees
     needle = employee_arg.lower()
@@ -88,6 +90,19 @@ def _filter_employees_by_arg(employees: Dict[str, Dict[str, List[str]]], employe
     if not matching and "_" in employee_arg:
         name_part = employee_arg.rsplit("_", 1)[-1].lower()
         matching = {k: v for k, v in employees.items() if name_part in k.lower()}
+    return matching
+
+
+def _filter_bills_by_employee(all_bills: Dict[str, List], employee_arg: str) -> Dict[str, List]:
+    """Filter bills map by --employee (partial match on emp_key). Returns subset or same dict if no match needed."""
+    employee_arg = (employee_arg or "").strip()
+    if not employee_arg:
+        return all_bills
+    needle = employee_arg.lower()
+    matching = {k: v for k, v in all_bills.items() if needle in k.lower()}
+    if not matching and "_" in employee_arg:
+        name_part = employee_arg.rsplit("_", 1)[-1].lower()
+        matching = {k: v for k, v in all_bills.items() if name_part in k.lower()}
     return matching
 
 
@@ -282,11 +297,12 @@ class BillDeskApp:
         # 1. Preprocessing once for all bills (all categories)
         if not self.all_bills:
             return all_decisions
+        category_filter = getattr(self.args, "category", None)
         print("\n⚖️ Running pre-processing (once for all categories)...")
         groups_data_all, save_data_all = run_preprocessing(
             self.all_bills,
             policy,
-            category_filter=None,
+            category_filter=category_filter,
             policy_extractor=self.decision_engine.policy_extractor if self.decision_engine else None,
             enable_rag=self.config.enable_rag,
         )
@@ -336,7 +352,10 @@ class BillDeskApp:
         print(f"🤖 Model: {self.config.model_name}")
         print(f"🔍 RAG Enabled: {self.config.enable_rag}")
         if getattr(self.args, "decision_only", False):
-            print("⚖️ Mode: decision-only (using existing OCR/validation output)")
+            msg = "⚖️ Mode: decision-only (using existing OCR/validation output)"
+            if getattr(self.args, "employee", None):
+                msg += f" for employee: {self.args.employee}"
+            print(msg)
         print("=" * 60)
 
         if getattr(self.args, "decision_only", False):
@@ -348,7 +367,7 @@ class BillDeskApp:
         print("=" * 60)
 
     def _run_decision_only(self) -> None:
-        """Load policy and bills from output_dir, run decision engine, write results."""
+        """Load policy and bills from output_dir, run decision engine, write results. Optionally filter by --employee."""
         self.policy = self._load_policy_from_output()
         if not self.policy:
             return
@@ -356,6 +375,17 @@ class BillDeskApp:
         if not self.all_bills:
             print("❌ No bills found in output. Run full flow first (without --decision-only).")
             return
+        employee_arg = (getattr(self.args, "employee", None) or "").strip()
+        if employee_arg:
+            before_count = len(self.all_bills)
+            before_keys = list(self.all_bills.keys())
+            self.all_bills = _filter_bills_by_employee(self.all_bills, employee_arg)
+            if not self.all_bills:
+                available = ", ".join(sorted(before_keys)) if before_keys else "(none)"
+                print(f"❌ No employee found matching: {employee_arg!r}")
+                print(f"   Available keys in output: {available}")
+                return
+            print(f"👤 Decision-only filtered to employee(s): {list(self.all_bills.keys())} (from {before_count} total)")
         print(f"📂 Loaded policy and {sum(len(v) for v in self.all_bills.values())} bills for {len(self.all_bills)} employee(s)")
         self._init_decision_engine()
         _fetch_org_data_for_employees(self.employee_org_data, self.all_bills, get_org_client())
@@ -442,6 +472,9 @@ Examples:
 
   # Run only decision engine (use existing OCR/validation output)
   python src/app.py --decision-only
+
+  # Run decision only for a single employee (use with --decision-only)
+  python src/app.py --decision-only --employee IIIPL-1000
         """
     )
 
@@ -455,7 +488,7 @@ Examples:
 
     parser.add_argument(
         "--employee",
-        help="Process specific employee (partial match supported)"
+        help="Process or run decision for a single employee (partial match on emp_key). Works with full flow and --decision-only."
     )
 
     parser.add_argument(
