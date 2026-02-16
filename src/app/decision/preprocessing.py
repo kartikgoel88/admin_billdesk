@@ -44,6 +44,11 @@ def _validation_to_reason(validation: Dict) -> str:
     return "; ".join(reasons) if reasons else "Validation failed"
 
 
+def _bill_is_valid(b: Dict) -> bool:
+    """True if the bill passed validation. is_valid can be on the bill root (extractor) or inside validation."""
+    return b.get("is_valid") is True or (b.get("validation") or {}).get("is_valid") is True
+
+
 def _invalid_bill_reasons_from_bills(bills: List[Dict]) -> List[Dict]:
     """Build list of {bill_id, reason} from validation for invalid bills."""
     return [
@@ -173,8 +178,8 @@ def prepare_groups(bills_map: Dict[str, List[Dict]]) -> Tuple[List[DecisionGroup
             category_groups.setdefault(cat, []).append(b)
 
         for category, cat_bills in category_groups.items():
-            valid_bills = [b for b in cat_bills if b.get("validation", {}).get("is_valid")]
-            invalid_bills = [b for b in cat_bills if not b.get("validation", {}).get("is_valid")]
+            valid_bills = [b for b in cat_bills if _bill_is_valid(b)]
+            invalid_bills = [b for b in cat_bills if not _bill_is_valid(b)]
 
             groups_data.extend(_groups_for_category(emp_id, emp_name, category, valid_bills, invalid_bills))
             save_data.append(_save_entry(emp_id, emp_name, category, valid_bills, invalid_bills))

@@ -6,7 +6,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -210,14 +210,15 @@ def _invoke_decision_llm(
     llm: Any,
     system_prompt: str,
     policy: Dict,
-    groups_data: List[DecisionGroup],
+    groups_with_indices: List[Tuple[int, DecisionGroup]],
     employee_org_data: Optional[Dict[str, Any]],
 ) -> str:
-    """Build payload, run LLM chain, return raw output string."""
+    """Build payload, run LLM chain, return raw output string.
+    groups_with_indices: only groups that have at least one valid bill, with their original group_index."""
     groups_list = []
-    for idx, g in enumerate(groups_data):
+    for orig_idx, g in groups_with_indices:
         d = g.to_dict()
-        d["group_index"] = idx
+        d["group_index"] = orig_idx
         groups_list.append(d)
     payload: Dict[str, Any] = {"policy": policy, "groups": groups_list}
     if employee_org_data:
@@ -409,31 +410,59 @@ def _make_parse_failed_placeholder(group: DecisionGroup) -> Dict[str, Any]:
     }
 
 
+def _make_all_invalid_placeholder(group: DecisionGroup) -> Dict[str, Any]:
+    """Build a REJECT decision for a group that had no valid bills (not sent to LLM)."""
+    g = group.to_dict()
+    valid = g.get("valid_bills") or []
+    invalid = g.get("invalid_bills") or []
+    reasons = (g.get("invalid_bill_reasons") or [])
+    return {
+        "decision": "REJECT",
+        "parse_failed": False,
+        "employee_id": g.get("employee_id", ""),
+        "employee_name": g.get("employee_name", ""),
+        "category": g.get("category", "unknown"),
+        "valid_bill_ids": list(valid),
+        "invalid_bill_ids": list(invalid),
+        "invalid_bill_reasons": list(reasons),
+        "claimed_amount": 0,
+        "approved_amount": 0,
+        "currency": g.get("currency", "INR"),
+        "reasons": ["All bills invalid; not sent to LLM."],
+    }
+
+
 def _parse_and_enrich_decisions(
     output: str,
     groups_data: List[DecisionGroup],
     output_dir: Optional[str] = None,
     model_name: Optional[str] = None,
+    no_valid_bills_indices: Optional[Set[int]] = None,
 ) -> List[Dict]:
     """Parse LLM output as JSON list and enrich each item. Uses repair/fallback parsing.
-    On full parse failure returns placeholders for all groups (parse_failed). On count mismatch or per-item failure: continue with parsed items and add parse_failed placeholders for missing/failed ones."""
+    On full parse failure returns placeholders for all groups (parse_failed). On count mismatch or per-item failure: continue with parsed items and add parse_failed placeholders for missing/failed ones.
+    Groups in no_valid_bills_indices were not sent to LLM (all bills invalid); use REJECT placeholder for them when no decision is found."""
+    no_valid = no_valid_bills_indices or set()
     raw_decisions, parse_error = _extract_decisions_from_llm_output(output)
     if raw_decisions is None:
         _report_parse_failure(output, parse_error or "unknown", output_dir, model_name)
-        # Return one parse_failed placeholder per group so we still produce output (e.g. meal) instead of []
-        print("📋 Using parse_failed placeholders for all groups (manual review).")
+        # Return one placeholder per group: all-invalid placeholder for no_valid_bills_indices, else parse_failed
+        print("📋 Using placeholders for all groups (parse failed or no LLM call).")
         result: List[Dict] = []
-        for group in groups_data:
-            item = _make_parse_failed_placeholder(group)
+        for i, group in enumerate(groups_data):
+            if i in no_valid:
+                item = _make_all_invalid_placeholder(group)
+            else:
+                item = _make_parse_failed_placeholder(group)
+                item["parse_failed"] = True
             _enrich_decision_item(item, group.to_dict())
-            item["parse_failed"] = True
             result.append(item)
         return result
 
     n_groups = len(groups_data)
     n_parsed = len(raw_decisions)
     if n_parsed != n_groups:
-        print(f"\n⚠️ Decision count mismatch: expected {n_groups} decision(s), got {n_parsed}. Filling missing with parse_failed placeholders.")
+        print(f"\n⚠️ Decision count mismatch: expected {n_groups} decision(s), got {n_parsed}. Filling missing with placeholders.")
 
     # Map parsed decisions by group_index so results stay in same order as groups_data
     decision_by_index: Dict[int, List[Dict]] = {}
@@ -453,12 +482,16 @@ def _parse_and_enrich_decisions(
         elif len(candidates) > 1:
             item = candidates[0]
         else:
-            # No decision with matching group_index; fall back to position-based for backward compatibility
+            # No decision with matching group_index
             item = raw_decisions[i] if i < n_parsed else None
         if item is None or not isinstance(item, dict):
-            item = _make_parse_failed_placeholder(group)
+            # Use all-invalid placeholder when group was not sent to LLM; else parse_failed
+            if i in no_valid:
+                item = _make_all_invalid_placeholder(group)
+            else:
+                item = _make_parse_failed_placeholder(group)
+                item["parse_failed"] = True
             _enrich_decision_item(item, group_dict)
-            item["parse_failed"] = True
             result.append(item)
             continue
         try:
@@ -562,17 +595,27 @@ class DecisionEngine:
             groups_data, save_data, self.output_dir, self.model_name
         )
 
-        # 2. Engine: LLM + parse/enrich
+        # 2. Engine: LLM only for groups with at least one valid bill; parse/enrich
+        groups_to_llm = [(i, g) for i, g in enumerate(groups_data) if (g.valid_bills or [])]
+        no_valid_bills_indices = {i for i, g in enumerate(groups_data) if not (g.valid_bills or [])}
+        if no_valid_bills_indices:
+            print(f"   ⏭️ Skipping LLM for {len(no_valid_bills_indices)} group(s) with no valid bills (is_valid=false).")
+
         system_prompt = self._load_system_prompt()
-        raw_output = _invoke_decision_llm(
-            self.llm, system_prompt, policy, groups_data, employee_org_data
-        )
-        print("\n📄 Decision Output (raw):")
-        print(raw_output)
+        if not groups_to_llm:
+            raw_output = "(No groups with valid bills; LLM not invoked.)"
+            print("\n📄 No groups with valid bills; skipping LLM call.")
+        else:
+            raw_output = _invoke_decision_llm(
+                self.llm, system_prompt, policy, groups_to_llm, employee_org_data
+            )
+            print("\n📄 Decision Output (raw):")
+            print(raw_output)
 
         decisions = _parse_and_enrich_decisions(
             raw_output, groups_data,
             output_dir=self.output_dir, model_name=self.model_name,
+            no_valid_bills_indices=no_valid_bills_indices,
         )
         write_engine_output(raw_output, decisions, self.output_dir, self.model_name)
 
@@ -598,15 +641,25 @@ class DecisionEngine:
         If category is provided, engine raw output is written to engine_raw_output_{category}.txt."""
         if not groups_data:
             return []
+        groups_to_llm = [(i, g) for i, g in enumerate(groups_data) if (g.valid_bills or [])]
+        no_valid_bills_indices = {i for i, g in enumerate(groups_data) if not (g.valid_bills or [])}
+        if no_valid_bills_indices:
+            print(f"   ⏭️ Skipping LLM for {len(no_valid_bills_indices)} group(s) with no valid bills (is_valid=false).")
+
         system_prompt = self._load_system_prompt()
-        raw_output = _invoke_decision_llm(
-            self.llm, system_prompt, policy, groups_data, employee_org_data
-        )
-        print("\n📄 Decision Output (raw):")
-        print(raw_output)
+        if not groups_to_llm:
+            raw_output = "(No groups with valid bills; LLM not invoked.)"
+            print("\n📄 No groups with valid bills; skipping LLM call.")
+        else:
+            raw_output = _invoke_decision_llm(
+                self.llm, system_prompt, policy, groups_to_llm, employee_org_data
+            )
+            print("\n📄 Decision Output (raw):")
+            print(raw_output)
         decisions = _parse_and_enrich_decisions(
             raw_output, groups_data,
             output_dir=self.output_dir, model_name=self.model_name,
+            no_valid_bills_indices=no_valid_bills_indices,
         )
         write_engine_output(raw_output, decisions, self.output_dir, self.model_name, category=category)
         copy_files(
