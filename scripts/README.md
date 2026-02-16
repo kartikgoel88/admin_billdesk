@@ -14,16 +14,17 @@ python scripts/run_app.py --enable-rag
 
 ## Local LLM (Ollama)
 
-- **`run_local_llm.sh`** – Ensure Ollama is installed, pull the model from config (or default `llama3.2`), optionally start `ollama serve`.
+- **`run_local_llm.sh`** – Ensure Ollama is installed, pull the model from config (uses `llm.provider` and that provider’s model), optionally start `ollama serve`. Supports `ollama` (e.g. llama3.2) and `ollama_qwen` (Qwen 2.5 L 72B Instruct).
 
 Usage:
 ```bash
-./scripts/run_local_llm.sh              # pull default model from config
-./scripts/run_local_llm.sh llama3.2      # pull specific model
-./scripts/run_local_llm.sh mistral --serve   # pull and start API in background
+./scripts/run_local_llm.sh                        # pull model for current llm.provider (ollama or ollama_qwen)
+./scripts/run_local_llm.sh llama3.2               # pull specific model
+./scripts/run_local_llm.sh qwen2.5:72b-instruct   # pull Qwen 2.5 72B Instruct
+./scripts/run_local_llm.sh mistral --serve        # pull and start API in background
 ```
 
-Then set `llm.provider: ollama` in `src/config/config.yaml` and run the app.
+Then set `llm.provider` to `ollama` or `ollama_qwen` in `src/config/config.yaml` and run the app.
 
 ## SharePoint sync
 
