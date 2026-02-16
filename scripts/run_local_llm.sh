@@ -24,15 +24,21 @@ done
 
 if [ -z "$MODEL" ]; then
   if [ -f "src/config/config.yaml" ]; then
-    PROVIDER=$(grep -A 3 "^llm:" src/config/config.yaml | grep "provider:" | head -1 | sed 's/.*provider:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
+    # Top-level llm.provider only (exclude "providers:")
+    PROVIDER=$(grep -E "^[[:space:]]*provider:" src/config/config.yaml | head -1 | sed 's/.*provider:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
     if [ "$PROVIDER" = "ollama" ] || [ "$PROVIDER" = "ollama_qwen" ]; then
       MODEL=$(grep -A 5 "^    $PROVIDER:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
     fi
     if [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen" ]; then
       MODEL="qwen2.5:72b-instruct"
     fi
+    # When config provider is not local (e.g. openai), default to Qwen for "run local llm"
+    if [ -z "$MODEL" ]; then
+      MODEL=$(grep -A 5 "^    ollama_qwen:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
+      [ -z "$MODEL" ] && MODEL="qwen2.5:72b-instruct"
+    fi
   fi
-  [ -z "$MODEL" ] && MODEL="llama3.2"
+  [ -z "$MODEL" ] && MODEL="qwen2.5:72b-instruct"
 fi
 
 echo "=== BillDesk – Local LLM (Ollama) ==="
