@@ -84,8 +84,7 @@ ocr:
 
 # LLM: change provider by setting 'provider' to one of the keys under 'providers'.
 # API keys: set in .env (see .env.example). Config only lists env var names (api_key_env).
-# Use provider: ollama or ollama_qwen for local models (no API key; run scripts/run_local_llm.sh first).
-# ollama_qwen = Qwen 2.5 L 72B Instruct (pull with: ollama pull qwen2.5:72b-instruct).
+# Use provider: ollama, ollama_qwen (72B), or ollama_qwen_14b (14B Q4) for local (no API key; run scripts/run_local_llm.sh first).
 llm:
   provider: openai
   temperature: 0
@@ -96,6 +95,9 @@ llm:
       base_url: "http://localhost:11434"   # Ollama API (optional; default localhost:11434)
     ollama_qwen:
       model: qwen2.5:72b-instruct  # Qwen 2.5 L 72B Instruct (local)
+      base_url: "http://localhost:11434"
+    ollama_qwen_14b:
+      model: qwen2.5:14b-instruct  # Qwen 2.5 14B Q4 (local, same as Hugging Face Qwen2.5-14B-Instruct-AWQ)
       base_url: "http://localhost:11434"
     groq:
       model: llama-3.3-70b-versatile
@@ -116,10 +118,11 @@ llm:
       api_base_env: AZURE_OPENAI_ENDPOINT
       api_version: "2024-02-15-preview"
     huggingface:
-      model: meta-llama/Llama-3.2-3B-Instruct   # Hugging Face Hub repo_id
+      # Qwen2.5 14B Q4 (4-bit AWQ). If not supported by your provider, use Qwen/Qwen2.5-14B-Instruct
+      model: Qwen/Qwen2.5-14B-Instruct-AWQ
       api_key_env: HUGGINGFACEHUB_API_TOKEN
       api_key: ""
-      max_new_tokens: 1024
+      max_new_tokens: 2048
 
 # Optional org API: employee details, leave, manager. Not mandatory; if disabled or API fails, flow continues.
 org_api:

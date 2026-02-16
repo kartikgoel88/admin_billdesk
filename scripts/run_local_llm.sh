@@ -26,19 +26,22 @@ if [ -z "$MODEL" ]; then
   if [ -f "src/config/config.yaml" ]; then
     # Top-level llm.provider only (exclude "providers:")
     PROVIDER=$(grep -E "^[[:space:]]*provider:" src/config/config.yaml | head -1 | sed 's/.*provider:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
-    if [ "$PROVIDER" = "ollama" ] || [ "$PROVIDER" = "ollama_qwen" ]; then
+    if [ "$PROVIDER" = "ollama" ] || [ "$PROVIDER" = "ollama_qwen" ] || [ "$PROVIDER" = "ollama_qwen_14b" ]; then
       MODEL=$(grep -A 5 "^    $PROVIDER:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
     fi
     if [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen" ]; then
       MODEL="qwen2.5:72b-instruct"
     fi
-    # When config provider is not local (e.g. openai), default to Qwen for "run local llm"
+    if [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen_14b" ]; then
+      MODEL="qwen2.5:14b-instruct"
+    fi
+    # When config provider is not local (e.g. openai), default to Qwen 2.5 14B Q4 (matches Hugging Face choice)
     if [ -z "$MODEL" ]; then
-      MODEL=$(grep -A 5 "^    ollama_qwen:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
-      [ -z "$MODEL" ] && MODEL="qwen2.5:72b-instruct"
+      MODEL=$(grep -A 5 "^    ollama_qwen_14b:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
+      [ -z "$MODEL" ] && MODEL="qwen2.5:14b-instruct"
     fi
   fi
-  [ -z "$MODEL" ] && MODEL="qwen2.5:72b-instruct"
+  [ -z "$MODEL" ] && MODEL="qwen2.5:14b-instruct"
 fi
 
 echo "=== BillDesk – Local LLM (Ollama) ==="
@@ -67,7 +70,7 @@ if [ "$START_SERVE" = true ]; then
   echo "Starting Ollama serve in the background..."
   nohup ollama serve > "$PROJECT_ROOT/ollama_serve.log" 2>&1 &
   echo "  Log: $PROJECT_ROOT/ollama_serve.log"
-  echo "  To use local LLM: set llm.provider to 'ollama' or 'ollama_qwen' in src/config/config.yaml"
+  echo "  To use local LLM: set llm.provider to 'ollama', 'ollama_qwen', or 'ollama_qwen_14b' in src/config/config.yaml"
   echo ""
 else
   echo "To run the Ollama API server:"
@@ -76,6 +79,6 @@ else
   echo "Or run this script with --serve to start it in the background:"
   echo "  ./scripts/run_local_llm.sh $MODEL --serve"
   echo ""
-  echo "Then set llm.provider to 'ollama' or 'ollama_qwen' in src/config/config.yaml and run the app."
+  echo "Then set llm.provider to 'ollama', 'ollama_qwen', or 'ollama_qwen_14b' in src/config/config.yaml and run the app."
 fi
 echo "Done."
