@@ -43,7 +43,11 @@ def get_llm(
     llm_cfg = config.get(Co.LLM) or {}
     provider = (llm_cfg.get(Co.PROVIDER) or "groq").strip().lower()
     providers_cfg = llm_cfg.get(Co.PROVIDERS) or {}
+    # ollama_qwen: same backend as ollama, default model Qwen 2.5 72B Instruct
     provider_cfg = providers_cfg.get(provider) or {}
+    if provider == "ollama_qwen" and not provider_cfg:
+        provider_cfg = dict(providers_cfg.get("ollama") or {})
+        provider_cfg[Co.MODEL] = provider_cfg.get(Co.MODEL) or "qwen2.5:72b-instruct"
 
     model = (
         model
@@ -69,7 +73,7 @@ def get_llm(
             f"Unknown LLM provider: {provider!r}. Supported: {list(_BUILDERS)}. "
             "Set llm.provider in config.yaml and add the provider under llm.providers."
         )
-    if provider != "ollama" and not (api_key and api_key.strip()):
+    if provider not in ("ollama", "ollama_qwen") and not (api_key and api_key.strip()):
         raise ValueError(
             f"LLM provider {provider!r} requires an API key. Set {api_key_env_name!r} in .env (see .env.example) or "
             f"llm.providers.{provider}.api_key in config.yaml."
@@ -163,6 +167,7 @@ def _build_huggingface(model: str, temperature: float, api_key: str, provider_cf
 
 _BUILDERS: dict[str, Any] = {
     "ollama": _build_ollama,
+    "ollama_qwen": _build_ollama,  # Qwen 2.5 L 72B Instruct (local); same backend as ollama
     "groq": _build_groq,
     "openai": _build_openai,
     "anthropic": _build_anthropic,

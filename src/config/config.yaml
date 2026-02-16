@@ -84,7 +84,8 @@ ocr:
 
 # LLM: change provider by setting 'provider' to one of the keys under 'providers'.
 # API keys: set in .env (see .env.example). Config only lists env var names (api_key_env).
-# Use provider: ollama for local models (no API key; run scripts/run_local_llm.sh first).
+# Use provider: ollama or ollama_qwen for local models (no API key; run scripts/run_local_llm.sh first).
+# ollama_qwen = Qwen 2.5 L 72B Instruct (pull with: ollama pull qwen2.5:72b-instruct).
 llm:
   provider: openai
   temperature: 0
@@ -93,6 +94,9 @@ llm:
     ollama:
       model: llama3.2              # e.g. llama3.2, mistral, codellama
       base_url: "http://localhost:11434"   # Ollama API (optional; default localhost:11434)
+    ollama_qwen:
+      model: qwen2.5:72b-instruct  # Qwen 2.5 L 72B Instruct (local)
+      base_url: "http://localhost:11434"
     groq:
       model: llama-3.3-70b-versatile
       api_key_env: GROQ_API_KEY
