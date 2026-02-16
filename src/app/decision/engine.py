@@ -71,6 +71,7 @@ _DECISION_JSON_SCHEMA = {
                                 "type": "array",
                                 "items": {"type": "string"},
                             },
+                            "group_index": {"type": "integer"},
                         },
                         "required": [
                             "decision",
@@ -213,12 +214,21 @@ def _invoke_decision_llm(
     employee_org_data: Optional[Dict[str, Any]],
 ) -> str:
     """Build payload, run LLM chain, return raw output string."""
-    payload: Dict[str, Any] = {"policy": policy, "groups": [g.to_dict() for g in groups_data]}
+    groups_list = []
+    for idx, g in enumerate(groups_data):
+        d = g.to_dict()
+        d["group_index"] = idx
+        groups_list.append(d)
+    payload: Dict[str, Any] = {"policy": policy, "groups": groups_list}
     if employee_org_data:
         payload["employee_org_data"] = employee_org_data
         print("   📎 Using org data (employee/leave/manager) for enrichment")
     # OpenAI response_format=json_object requires the word "json" in messages
-    user_prompt = "Respond with a JSON array only (one object per group).\n\n" + json.dumps(payload, indent=2)
+    user_prompt = (
+        "Respond with a JSON array only (one object per group). "
+        "You MUST return each decision with the same group_index (0-based) as the corresponding input group so results can be matched.\n\n"
+        + json.dumps(payload, indent=2)
+    )
     prompt = ChatPromptTemplate.from_messages([
         ("system", "{system_prompt}"),
         ("human", "{user_prompt}"),
@@ -425,19 +435,27 @@ def _parse_and_enrich_decisions(
     if n_parsed != n_groups:
         print(f"\n⚠️ Decision count mismatch: expected {n_groups} decision(s), got {n_parsed}. Filling missing with parse_failed placeholders.")
 
+    # Map parsed decisions by group_index so results stay in same order as groups_data
+    decision_by_index: Dict[int, List[Dict]] = {}
+    for item in raw_decisions:
+        if isinstance(item, dict):
+            idx = item.get("group_index")
+            if isinstance(idx, int) and 0 <= idx < n_groups:
+                decision_by_index.setdefault(idx, []).append(item)
+
     result: List[Dict] = []
     for i in range(n_groups):
         group = groups_data[i]
         group_dict = group.to_dict()
-        if i >= n_parsed:
-            # No LLM decision for this group
-            item = _make_parse_failed_placeholder(group)
-            _enrich_decision_item(item, group_dict)
-            item["parse_failed"] = True
-            result.append(item)
-            continue
-        item = raw_decisions[i]
-        if not isinstance(item, dict):
+        candidates = decision_by_index.get(i, [])
+        if len(candidates) == 1:
+            item = candidates[0]
+        elif len(candidates) > 1:
+            item = candidates[0]
+        else:
+            # No decision with matching group_index; fall back to position-based for backward compatibility
+            item = raw_decisions[i] if i < n_parsed else None
+        if item is None or not isinstance(item, dict):
             item = _make_parse_failed_placeholder(group)
             _enrich_decision_item(item, group_dict)
             item["parse_failed"] = True
