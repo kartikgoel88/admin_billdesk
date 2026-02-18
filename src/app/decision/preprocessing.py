@@ -27,6 +27,9 @@ def _validation_to_reason(validation: Dict) -> str:
         return "Validation failed"
     v = validation
     reasons = []
+    if not v.get("critical_fields_ok", True):
+        for r in v.get("critical_fields_reasons") or []:
+            reasons.append(r)
     if not v.get("month_match", True):
         reasons.append("Month mismatch")
     if not v.get("name_match", True):

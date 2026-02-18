@@ -209,6 +209,31 @@ def apply_amount_cap(bill: dict, amount: float | None, limit: float | None) -> N
         bill["reimbursable_amount"] = amount
 
 
+def check_critical_fields(bill: dict, category: str) -> dict:
+    """
+    Check that critical fields are present and valid.
+    Returns dict with critical_fields_ok (bool) and critical_fields_reasons (list of str).
+    Validation should fail if critical_fields_ok is False.
+    """
+    reasons: list[str] = []
+    # Amount: must be present and > 0 for all expense bills
+    amount = parse_amount(bill.get("amount"))
+    if amount is None:
+        reasons.append("amount is missing")
+    elif amount <= 0:
+        reasons.append("amount is zero or negative")
+    # Date: required for meal/fuel (month match and audit)
+    if category in ("meal", "fuel") and not bill.get("date"):
+        reasons.append("date is missing")
+    # Filename: identifies the receipt and links to OCR
+    if not bill.get("filename"):
+        reasons.append("filename is missing")
+    return {
+        "critical_fields_ok": len(reasons) == 0,
+        "critical_fields_reasons": reasons,
+    }
+
+
 def month_match(bill: dict, params: dict, date_key: str = "date") -> bool:
     """Return True if month check is disabled (month_match_required: false) or bill date month matches emp_month."""
     if not params.get("month_match_required", True):

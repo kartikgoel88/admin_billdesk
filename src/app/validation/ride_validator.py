@@ -3,6 +3,7 @@
 from rapidfuzz import fuzz
 
 from app.validation._common import (
+    check_critical_fields,
     ensure_bill_id,
     get_validation_params,
     month_match,
@@ -21,6 +22,9 @@ class RideValidator:
         validations = {}
 
         ensure_bill_id(ride, params["manual_id_prefix"])
+        crit = check_critical_fields(ride, "cab")
+        validations["critical_fields_ok"] = crit["critical_fields_ok"]
+        validations["critical_fields_reasons"] = crit["critical_fields_reasons"]
         validations["month_match"] = month_match(ride, params)
 
         rider = (ride.get("rider_name") or "").lower()
@@ -53,7 +57,8 @@ class RideValidator:
             validations["address_match"] = True
 
         validations["is_valid"] = (
-            validations["month_match"]
+            validations["critical_fields_ok"]
+            and validations["month_match"]
             and validations["name_match"]
             and validations["address_match"]
         )

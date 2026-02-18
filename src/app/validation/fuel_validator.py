@@ -4,6 +4,7 @@ from rapidfuzz import fuzz
 
 from app.validation._common import (
     apply_amount_cap,
+    check_critical_fields,
     correct_rupee_misread,
     ensure_bill_id,
     get_validation_params,
@@ -20,6 +21,9 @@ class FuelValidator:
         validations = {}
 
         ensure_bill_id(fuel_bill, params["manual_id_prefix"])
+        crit = check_critical_fields(fuel_bill, "fuel")
+        validations["critical_fields_ok"] = crit["critical_fields_ok"]
+        validations["critical_fields_reasons"] = crit["critical_fields_reasons"]
         validations["month_match"] = month_match(fuel_bill, params, date_key="date")
 
         receipt_name = (
@@ -42,5 +46,9 @@ class FuelValidator:
             validations["amount_rupee_corrected"] = True
         apply_amount_cap(fuel_bill, amount, params.get("amount_limit_per_bill"))
 
-        validations["is_valid"] = validations["month_match"] and validations["name_match"]
+        validations["is_valid"] = (
+            validations["critical_fields_ok"]
+            and validations["month_match"]
+            and validations["name_match"]
+        )
         return validations

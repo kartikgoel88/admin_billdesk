@@ -4,6 +4,7 @@ from rapidfuzz import fuzz
 
 from app.validation._common import (
     apply_amount_cap,
+    check_critical_fields,
     correct_rupee_misread,
     ensure_bill_id,
     get_validation_params,
@@ -20,6 +21,9 @@ class MealValidator:
         validations = {}
 
         ensure_bill_id(meal_invoice, params["manual_id_prefix"])
+        crit = check_critical_fields(meal_invoice, "meal")
+        validations["critical_fields_ok"] = crit["critical_fields_ok"]
+        validations["critical_fields_reasons"] = crit["critical_fields_reasons"]
         validations["month_match"] = month_match(meal_invoice, params)
 
         rider = (meal_invoice.get("buyer_name") or "").lower()
@@ -40,5 +44,9 @@ class MealValidator:
             validations["amount_rupee_corrected"] = True
         apply_amount_cap(meal_invoice, amount, params.get("amount_limit_per_bill"))
 
-        validations["is_valid"] = validations["month_match"] and validations["name_match"]
+        validations["is_valid"] = (
+            validations["critical_fields_ok"]
+            and validations["month_match"]
+            and validations["name_match"]
+        )
         return validations

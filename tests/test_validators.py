@@ -16,8 +16,10 @@ class TestFuelValidator:
             "emp_month": "jan",
             "emp_name": "john doe",
             "employee_name": "John Doe",
+            "amount": 100,
         }
         result = v.validate(bill)
+        assert result["critical_fields_ok"] is True
         assert result["month_match"] is True
         assert result["name_match"] is True
         assert result["name_match_score"] >= 75
@@ -32,6 +34,7 @@ class TestFuelValidator:
             "emp_month": "jan",
             "emp_name": "john",
             "employee_name": "John",
+            "amount": 100,
         }
         result = v.validate(bill, context=ctx)
         assert result["month_match"] is False
@@ -46,6 +49,7 @@ class TestFuelValidator:
             "emp_month": "jan",
             "emp_name": "completely different person",
             "employee_name": "Someone Else",
+            "amount": 100,
         }
         result = v.validate(bill, context=ctx)
         assert result["month_match"] is True
@@ -54,11 +58,27 @@ class TestFuelValidator:
 
     def test_assigns_id_when_missing(self):
         v = FuelValidator()
-        bill = {"filename": "x.pdf", "date": "01/01/2025", "emp_month": "jan", "emp_name": "a", "employee_name": "a"}
+        bill = {"filename": "x.pdf", "date": "01/01/2025", "emp_month": "jan", "emp_name": "a", "employee_name": "a", "amount": 100}
         result = v.validate(bill)
         assert "id" in bill
         assert bill["id"].startswith("MANUAL-")
         assert "x.pdf" in bill["id"]
+
+    def test_critical_fields_fail_amount_missing(self):
+        v = FuelValidator()
+        bill = {"filename": "f.pdf", "date": "15/01/2025", "emp_month": "jan", "emp_name": "j", "employee_name": "J"}
+        result = v.validate(bill)
+        assert result["critical_fields_ok"] is False
+        assert "amount is missing" in result["critical_fields_reasons"]
+        assert result["is_valid"] is False
+
+    def test_critical_fields_fail_amount_zero(self):
+        v = FuelValidator()
+        bill = {"filename": "f.pdf", "date": "15/01/2025", "emp_month": "jan", "emp_name": "j", "employee_name": "J", "amount": 0}
+        result = v.validate(bill)
+        assert result["critical_fields_ok"] is False
+        assert "amount is zero or negative" in result["critical_fields_reasons"]
+        assert result["is_valid"] is False
 
     def test_amount_capped_at_limit(self):
         v = FuelValidator()
@@ -115,8 +135,10 @@ class TestMealValidator:
             "emp_month": "mar",
             "emp_name": "jane smith",
             "buyer_name": "Jane Smith",
+            "amount": 250,
         }
         result = v.validate(bill)
+        assert result["critical_fields_ok"] is True
         assert result["month_match"] is True
         assert result["name_match"] is True
         assert result["is_valid"] is True
@@ -130,6 +152,7 @@ class TestMealValidator:
             "emp_month": "jan",
             "emp_name": "a",
             "buyer_name": "a",
+            "amount": 100,
         }
         result = v.validate(bill, context=ctx)
         assert result["month_match"] is False
@@ -137,10 +160,26 @@ class TestMealValidator:
 
     def test_assigns_id_when_missing(self):
         v = MealValidator()
-        bill = {"filename": "m.pdf", "date": "01/01/2025", "emp_month": "jan", "emp_name": "a", "buyer_name": "a"}
+        bill = {"filename": "m.pdf", "date": "01/01/2025", "emp_month": "jan", "emp_name": "a", "buyer_name": "a", "amount": 100}
         v.validate(bill)
         assert "id" in bill
         assert bill["id"].startswith("MANUAL-")
+
+    def test_critical_fields_fail_amount_zero(self):
+        v = MealValidator()
+        bill = {"filename": "m.pdf", "date": "10/03/2025", "emp_month": "mar", "emp_name": "j", "buyer_name": "J", "amount": 0}
+        result = v.validate(bill)
+        assert result["critical_fields_ok"] is False
+        assert "amount is zero or negative" in result["critical_fields_reasons"]
+        assert result["is_valid"] is False
+
+    def test_critical_fields_fail_date_missing(self):
+        v = MealValidator()
+        bill = {"filename": "m.pdf", "emp_month": "mar", "emp_name": "j", "buyer_name": "J", "amount": 100}
+        result = v.validate(bill)
+        assert result["critical_fields_ok"] is False
+        assert "date is missing" in result["critical_fields_reasons"]
+        assert result["is_valid"] is False
 
     def test_amount_capped_at_limit(self):
         v = MealValidator()
@@ -220,9 +259,11 @@ class TestRideValidator:
             "client": "ACME",
             "pickup_address": "123 Main St",
             "drop_address": "456 ACME Office Blvd",
+            "amount": 500,
         }
         context = {"client_addresses": {"ACME": ["123 main st", "456 acme office blvd"]}}
         result = v.validate(bill, context)
+        assert result["critical_fields_ok"] is True
         assert result["month_match"] is True
         assert result["name_match"] is True
         assert result["address_match"] is True
@@ -239,6 +280,7 @@ class TestRideValidator:
             "client": "XYZ",
             "pickup_address": "random place",
             "drop_address": "another random",
+            "amount": 100,
         }
         # Use high threshold so "random place" vs "official office address only" fails
         context = {
@@ -265,6 +307,7 @@ class TestRideValidator:
             "client": "C",
             "pickup_address": "x",
             "drop_address": "y",
+            "amount": 100,
         }
         result = v.validate(bill, context=ctx)
         assert result["address_match_score"] == 0
@@ -282,8 +325,18 @@ class TestRideValidator:
             "client": "X",
             "pickup_address": "addr",
             "drop_address": "addr",
+            "amount": 100,
         }
         context = {"client_addresses": {"X": ["addr"]}}
         v.validate(bill, context)
         assert "id" in bill
         assert bill["id"].startswith("MANUAL-")
+
+    def test_critical_fields_fail_amount_missing(self):
+        v = RideValidator()
+        bill = {"filename": "r.pdf", "date": "01/01/2025", "emp_month": "jan", "emp_name": "a", "rider_name": "A", "client": "X", "pickup_address": "x", "drop_address": "y"}
+        context = {"client_addresses": {"X": ["x", "y"]}}
+        result = v.validate(bill, context)
+        assert result["critical_fields_ok"] is False
+        assert "amount is missing" in result["critical_fields_reasons"]
+        assert result["is_valid"] is False
