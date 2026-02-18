@@ -32,16 +32,18 @@ if [ -z "$MODEL" ]; then
     _model=$(cd "$PROJECT_ROOT" && PYTHONPATH="$PROJECT_ROOT/src" "$PY_EXE" scripts/get_ollama_model.py 2>/dev/null) || true
     [ -n "$_model" ] && MODEL="$_model"
   fi
-  # Fallback: grep config (fragile if YAML indentation changes)
+  # Fallback: grep config (match llm.provider = 2-space indent, then providers.<name>.model = 4-space block)
   if [ -z "$MODEL" ] && [ -f "src/config/config.yaml" ]; then
-    PROVIDER=$(grep -E "^[[:space:]]*provider:" src/config/config.yaml | head -1 | sed 's/.*provider:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
-    if [ "$PROVIDER" = "ollama" ] || [ "$PROVIDER" = "ollama_qwen" ] || [ "$PROVIDER" = "ollama_qwen_14b" ]; then
-      MODEL=$(grep -A 5 "^    $PROVIDER:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
+    # llm.provider line is "  provider: ollama" (exactly 2 spaces under llm:)
+    PROVIDER=$(grep -E "^  provider:" src/config/config.yaml | head -1 | sed 's/.*provider:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
+    if [ -n "$PROVIDER" ] && { [ "$PROVIDER" = "ollama" ] || [ "$PROVIDER" = "ollama_qwen" ] || [ "$PROVIDER" = "ollama_qwen_14b" ]; }; then
+      # providers.ollama block is "    ollama:" then "      model: ..." (4 spaces, then 6)
+      MODEL=$(grep -A 8 "^  providers:" src/config/config.yaml | grep -A 5 "^    ${PROVIDER}:" | grep "^      model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
     fi
     [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen" ] && MODEL="qwen2.5:72b-instruct"
     [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen_14b" ] && MODEL="qwen2.5:14b-instruct"
     if [ -z "$MODEL" ]; then
-      MODEL=$(grep -A 5 "^    ollama_qwen_14b:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
+      MODEL=$(grep -A 8 "^  providers:" src/config/config.yaml | grep -A 5 "^    ollama_qwen_14b:" | grep "^      model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
       [ -z "$MODEL" ] && MODEL="qwen2.5:14b-instruct"
     fi
   fi
