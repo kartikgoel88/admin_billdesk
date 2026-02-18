@@ -23,19 +23,23 @@ for arg in "$@"; do
 done
 
 if [ -z "$MODEL" ]; then
-  if [ -f "src/config/config.yaml" ]; then
-    # Top-level llm.provider only (exclude "providers:")
+  # Prefer Python so we use the exact same config as the app (llm.provider + providers.<provider>.model)
+  if command -v uv >/dev/null 2>&1; then
+    _model=$(cd "$PROJECT_ROOT" && PYTHONPATH="$PROJECT_ROOT/src" uv run python scripts/get_ollama_model.py 2>/dev/null) || true
+    [ -n "$_model" ] && MODEL="$_model"
+  elif command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
+    PY_EXE=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+    _model=$(cd "$PROJECT_ROOT" && PYTHONPATH="$PROJECT_ROOT/src" "$PY_EXE" scripts/get_ollama_model.py 2>/dev/null) || true
+    [ -n "$_model" ] && MODEL="$_model"
+  fi
+  # Fallback: grep config (fragile if YAML indentation changes)
+  if [ -z "$MODEL" ] && [ -f "src/config/config.yaml" ]; then
     PROVIDER=$(grep -E "^[[:space:]]*provider:" src/config/config.yaml | head -1 | sed 's/.*provider:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
     if [ "$PROVIDER" = "ollama" ] || [ "$PROVIDER" = "ollama_qwen" ] || [ "$PROVIDER" = "ollama_qwen_14b" ]; then
       MODEL=$(grep -A 5 "^    $PROVIDER:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
     fi
-    if [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen" ]; then
-      MODEL="qwen2.5:72b-instruct"
-    fi
-    if [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen_14b" ]; then
-      MODEL="qwen2.5:14b-instruct"
-    fi
-    # When config provider is not local (e.g. openai), default to Qwen 2.5 14B Q4 (matches Hugging Face choice)
+    [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen" ] && MODEL="qwen2.5:72b-instruct"
+    [ -z "$MODEL" ] && [ "$PROVIDER" = "ollama_qwen_14b" ] && MODEL="qwen2.5:14b-instruct"
     if [ -z "$MODEL" ]; then
       MODEL=$(grep -A 5 "^    ollama_qwen_14b:" src/config/config.yaml | grep "model:" | head -1 | sed 's/.*model:[[:space:]]*//; s/"//g; s/[[:space:]]*#.*//' | tr -d " \t" || true)
       [ -z "$MODEL" ] && MODEL="qwen2.5:14b-instruct"
