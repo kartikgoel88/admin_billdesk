@@ -93,12 +93,15 @@ llm:
     ollama:
       model: llama3.2              # e.g. llama3.2, mistral, codellama
       base_url: "http://localhost:11434"   # Ollama API (optional; default localhost:11434)
+      num_ctx: 8192                # context window (tokens); increase if prompt truncation error (default 4096)
     ollama_qwen:
       model: qwen2.5:72b-instruct  # Qwen 2.5 L 72B Instruct (local)
       base_url: "http://localhost:11434"
+      num_ctx: 8192
     ollama_qwen_14b:
       model: qwen2.5:14b-instruct  # Qwen 2.5 14B Q4 (local, same as Hugging Face Qwen2.5-14B-Instruct-AWQ)
       base_url: "http://localhost:11434"
+      num_ctx: 8192
     groq:
       model: llama-3.3-70b-versatile
       api_key_env: GROQ_API_KEY

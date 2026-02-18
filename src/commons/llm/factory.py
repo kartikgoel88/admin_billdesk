@@ -137,15 +137,20 @@ def _build_azure(model: str, temperature: float, api_key: str, provider_cfg: dic
 
 
 def _build_ollama(model: str, temperature: float, api_key: str, provider_cfg: dict | None = None, **kwargs) -> Any:
-    """Local LLM via Ollama. No API key needed. Set llm.providers.ollama.base_url if not localhost:11434."""
+    """Local LLM via Ollama. No API key needed. Set llm.providers.ollama.base_url, num_ctx (context window size)."""
     from langchain_ollama import ChatOllama
     provider_cfg = provider_cfg or {}
     base_url = provider_cfg.get("base_url") or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
+    ollama_kwargs = dict(kwargs)
+    # num_ctx: context window size in tokens; increase if you see "truncating input prompt limit=4096"
+    num_ctx = provider_cfg.get("num_ctx")
+    if num_ctx is not None:
+        ollama_kwargs["num_ctx"] = int(num_ctx)
     return ChatOllama(
         model=model,
         temperature=temperature,
         base_url=base_url.rstrip("/"),
-        **kwargs,
+        **ollama_kwargs,
     )
 
 
